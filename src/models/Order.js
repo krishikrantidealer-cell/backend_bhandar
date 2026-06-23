@@ -56,7 +56,10 @@ const OrderSchema = new mongoose.Schema(
         lineItems: [LineItemSchema],
         notes: { type: String, default: "" },
         cancelledAt: { type: Date },
-        importedAt: { type: Date, default: Date.now }
+        importedAt: { type: Date, default: Date.now },
+        razorpayOrderId: { type: String, default: "" },
+        razorpayPaymentId: { type: String, default: "" },
+        razorpaySignature: { type: String, default: "" }
     },
     { timestamps: true }
 );

@@ -1,5 +1,4 @@
 const Customer = require("../models/Customer");
-const mongoose = require("mongoose");
 
 // GET /api/customers
 // Query params: ?page=1&limit=20&search=<text>
@@ -35,17 +34,10 @@ const getAllCustomers = async (req, res) => {
 };
 
 // GET /api/customers/:id
-// Can query by customerId (Shopify) or MongoDB ObjectId
 const getCustomerById = async (req, res) => {
     try {
         const { id } = req.params;
-        let customer;
-
-        if (mongoose.Types.ObjectId.isValid(id)) {
-            customer = await Customer.findById(id);
-        } else {
-            customer = await Customer.findOne({ customerId: id });
-        }
+        const customer = await Customer.findById(id);
 
         if (!customer) {
             return res.status(404).json({ success: false, message: "Customer not found" });

@@ -4,12 +4,23 @@ const Product = require("../models/Product");
 // Query params: ?page=1&limit=20&category=<id>&search=<text>&status=active
 const getAllProducts = async (req, res) => {
     try {
-        const { page = 1, limit = 20, category, search, status } = req.query;
+        const { page = 1, limit = 20, category, search, status, buy1get1 } = req.query;
 
         const filter = {};
-        if (category) filter.categoryIds = category;
+        if (category) {
+            if (category === "6a3935cebd6e0cfbef015a6a" || category === "Bio Products") {
+                filter.buy1get1 = true;
+            } else {
+                filter.categoryIds = category;
+            }
+        }
         if (status) filter.status = status;
         if (search) filter.$text = { $search: search };
+        if (buy1get1 === "true") {
+            filter.buy1get1 = true;
+        } else if (buy1get1 === "false") {
+            filter.buy1get1 = false;
+        }
 
         const skip = (Number(page) - 1) * Number(limit);
 
@@ -38,7 +49,12 @@ const getAllProducts = async (req, res) => {
 // GET /api/products/:handle
 const getProductByHandle = async (req, res) => {
     try {
-        const product = await Product.findOne({ handle: req.params.handle })
+        const mongoose = require("mongoose");
+        let query = { handle: req.params.handle };
+        if (mongoose.Types.ObjectId.isValid(req.params.handle)) {
+            query = { _id: req.params.handle };
+        }
+        const product = await Product.findOne(query)
             .populate("categoryIds", "name");
 
         if (!product) {

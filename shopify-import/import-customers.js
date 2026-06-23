@@ -8,31 +8,27 @@ const MONGO_URI =
 
 // ===== Schema =====
 const CustomerSchema = new mongoose.Schema({
-    customerId: { type: String, required: true, unique: true },
+    _id: { type: String, required: true },
     firstName: { type: String, default: "" },
     lastName: { type: String, default: "" },
     email: { type: String, default: "" },
-    acceptsEmailMarketing: { type: Boolean, default: false },
+    phone: { type: String, default: "" },
+    totalSpent: { type: Number, default: 0.0 },
+    totalOrders: { type: Number, default: 0 },
     defaultAddress: {
         company: { type: String, default: "" },
         address1: { type: String, default: "" },
         address2: { type: String, default: "" },
         city: { type: String, default: "" },
-        provinceCode: { type: String, default: "" },
-        countryCode: { type: String, default: "" },
+        province: { type: String, default: "" },
+        country: { type: String, default: "" },
         zip: { type: String, default: "" },
         phone: { type: String, default: "" }
     },
-    phone: { type: String, default: "" },
-    acceptsSmsMarketing: { type: Boolean, default: false },
-    totalSpent: { type: Number, default: 0.0 },
-    totalOrders: { type: Number, default: 0 },
     note: { type: String, default: "" },
-    taxExempt: { type: Boolean, default: false },
-    tags: [{ type: String }],
-    acceptsWhatsAppMarketing: { type: Boolean, default: false },
+    status: { type: String, enum: ["active", "inactive"], default: "active" },
     importedAt: { type: Date, default: Date.now }
-}, { strict: false });
+}, { _id: false, strict: false });
 
 const Customer = mongoose.model("Customer", CustomerSchema, "customers");
 
@@ -46,16 +42,18 @@ function clean(val) {
     return v;
 }
 
-function parseBool(val) {
-    if (!val) return false;
-    const v = val.trim().toLowerCase();
-    return v === "yes" || v === "true";
-}
-
 async function importCustomers() {
     try {
         await mongoose.connect(MONGO_URI);
         console.log("✅ Mongo Connected");
+
+        // Try to drop the obsolete index from the previous schema
+        try {
+            await mongoose.connection.collection("customers").dropIndex("customerId_1");
+            console.log("🗑 Dropped obsolete index: customerId_1");
+        } catch (e) {
+            // Ignore if index doesn't exist
+        }
 
         const rows = [];
 
@@ -78,39 +76,26 @@ async function importCustomers() {
 
             const customerId = clean(rawId);
 
-            // Extract tags
-            let tagsArray = [];
-            if (row["Tags"]) {
-                tagsArray = row["Tags"]
-                    .split(",")
-                    .map(t => t.trim())
-                    .filter(t => t.length > 0);
-            }
-
             const customer = {
-                customerId,
+                _id: customerId, // map directly to _id
                 firstName: row["First Name"] || "",
                 lastName: row["Last Name"] || "",
                 email: row["Email"] || "",
-                acceptsEmailMarketing: parseBool(row["Accepts Email Marketing"]),
+                phone: clean(row["Phone"] || ""),
+                totalSpent: parseFloat(row["Total Spent"]) || 0.0,
+                totalOrders: parseInt(row["Total Orders"], 10) || 0,
                 defaultAddress: {
                     company: row["Default Address Company"] || "",
                     address1: row["Default Address Address1"] || "",
                     address2: row["Default Address Address2"] || "",
                     city: row["Default Address City"] || "",
-                    provinceCode: row["Default Address Province Code"] || "",
-                    countryCode: row["Default Address Country Code"] || "",
+                    province: row["Default Address Province Code"] || "",
+                    country: row["Default Address Country Code"] || "",
                     zip: clean(row["Default Address Zip"] || ""),
                     phone: clean(row["Default Address Phone"] || "")
                 },
-                phone: clean(row["Phone"] || ""),
-                acceptsSmsMarketing: parseBool(row["Accepts SMS Marketing"]),
-                totalSpent: parseFloat(row["Total Spent"]) || 0.0,
-                totalOrders: parseInt(row["Total Orders"], 10) || 0,
                 note: row["Note"] || "",
-                taxExempt: parseBool(row["Tax Exempt"]),
-                tags: tagsArray,
-                acceptsWhatsAppMarketing: parseBool(row["Accepts WhatsApp Marketing"]),
+                status: "active",
                 importedAt: new Date()
             };
 

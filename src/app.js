@@ -5,6 +5,11 @@ const productRoutes = require("./routes/products");
 const categoryRoutes = require("./routes/categories");
 const customerRoutes = require("./routes/customers");
 const orderRoutes = require("./routes/orders");
+const couponRoutes = require("./routes/coupons");
+const cartRoutes = require("./routes/cart");
+const authRoutes = require("./routes/auth");
+const bannerRoutes = require("./routes/banners");
+
 
 const app = express();
 
@@ -17,6 +22,11 @@ app.use("/api/products", productRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/coupons", couponRoutes);
+app.use("/api/cart", cartRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/banners", bannerRoutes);
+
 
 // ===== Health Check =====
 app.get("/", (req, res) => {

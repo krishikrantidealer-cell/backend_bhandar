@@ -2,32 +2,28 @@ const mongoose = require("mongoose");
 
 const CustomerSchema = new mongoose.Schema(
     {
-        customerId: { type: String, required: true, unique: true, index: true, trim: true },
+        _id: { type: String, required: true }, // The custom Customer ID as primary key
         firstName: { type: String, default: "", trim: true },
         lastName: { type: String, default: "", trim: true },
         email: { type: String, default: "", index: true, trim: true },
-        acceptsEmailMarketing: { type: Boolean, default: false },
+        phone: { type: String, default: "", index: true, trim: true },
+        totalSpent: { type: Number, default: 0.0 },
+        totalOrders: { type: Number, default: 0 },
         defaultAddress: {
             company: { type: String, default: "" },
             address1: { type: String, default: "" },
             address2: { type: String, default: "" },
             city: { type: String, default: "" },
-            provinceCode: { type: String, default: "" },
-            countryCode: { type: String, default: "" },
+            province: { type: String, default: "" }, // State/Province code mapped from CSV
+            country: { type: String, default: "" },  // Country code mapped from CSV
             zip: { type: String, default: "" },
             phone: { type: String, default: "" }
         },
-        phone: { type: String, default: "", index: true, trim: true },
-        acceptsSmsMarketing: { type: Boolean, default: false },
-        totalSpent: { type: Number, default: 0.0 },
-        totalOrders: { type: Number, default: 0 },
         note: { type: String, default: "" },
-        taxExempt: { type: Boolean, default: false },
-        tags: [{ type: String }],
-        acceptsWhatsAppMarketing: { type: Boolean, default: false },
+        status: { type: String, enum: ["active", "inactive"], default: "active", index: true },
         importedAt: { type: Date, default: Date.now }
     },
-    { timestamps: true }
+    { _id: false, timestamps: true } // disable auto _id creation since we supply it explicitly
 );
 
 // Search index

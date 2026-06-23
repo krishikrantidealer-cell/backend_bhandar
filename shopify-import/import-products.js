@@ -1,22 +1,15 @@
 const fs = require("fs");
 const csv = require("csv-parser");
-const mongoose = require("mongoose");
+const mongoose = require("../node_modules/mongoose");
 
 // ===== Mongo Connection =====
 const MONGO_URI =
     "mongodb+srv://krishikrantidealer_db_user:KrishiKranti%402026@krishikranti.tyerpvc.mongodb.net/krishibhandar_db?appName=KrishiKranti";
 
 
-// ===== Schema =====
-const CategorySchema = new mongoose.Schema({
-    name: { type: String, required: true, unique: true }
-});
-const Category = mongoose.model("Category", CategorySchema, "categories");
-
-const ProductSchema = new mongoose.Schema({
-    categoryIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Category" }]
-}, { strict: false });
-const Product = mongoose.model("ProductRaw", ProductSchema, "products_raw");
+// ===== Models =====
+const Category = require("../src/models/Category");
+const Product = require("../src/models/Product");
 
 // Helper to classify a product — returns an ARRAY of all matching category names
 function classifyProduct(title) {
@@ -142,7 +135,19 @@ function classifyProduct(title) {
         matched.push("fertilizer");
     }
 
+    // Bio Products (Buy 1 Get 1 Free / BOGO)
+    if (/1\+1\s+Free|1-1-free|1\+1\s+Free\s+Offer|BOGO/i.test(title)) {
+        matched.push("Bio Products");
+    }
+
     return matched;
+}
+
+// Helper to determine if product is Buy 1 Get 1
+function isBuy1Get1(title, handle) {
+    const t = (title || "").toLowerCase();
+    const h = (handle || "").toLowerCase();
+    return t.includes("1+1 free") || h.includes("1-1-free") || t.includes("1+1 free offer") || t.includes("bogo");
 }
 
 // ===== Main Function =====
@@ -192,12 +197,14 @@ async function importProducts() {
             if (!handle) return;
 
             if (!groupedProducts[handle]) {
+                const title = row["Title"] || "";
                 groupedProducts[handle] = {
                     handle: handle,
-                    title: row["Title"] || "",
+                    title: title,
                     bodyHtml: row["Body (HTML)"] || "",
                     vendor: row["Vendor"] || "",
                     status: row["Status"] || "",
+                    buy1get1: isBuy1Get1(title, handle),
                     variants: [],
                     images: [],
                     importedAt: new Date()
@@ -206,6 +213,7 @@ async function importProducts() {
                 // Populate fields if they are missing in the first row but present in later rows
                 if (!groupedProducts[handle].title && row["Title"]) {
                     groupedProducts[handle].title = row["Title"];
+                    groupedProducts[handle].buy1get1 = isBuy1Get1(row["Title"], handle);
                 }
                 if (!groupedProducts[handle].bodyHtml && row["Body (HTML)"]) {
                     groupedProducts[handle].bodyHtml = row["Body (HTML)"];
@@ -220,8 +228,24 @@ async function importProducts() {
 
             // Extract variant if Option1 Value or Variant SKU is present
             if (row["Option1 Value"] || row["Variant SKU"]) {
+                let sku = (row["Variant SKU"] || "").trim();
+
+                // Auto-generate SKU if it's blank in the CSV
+                if (!sku) {
+                    const cleanHandle = handle.replace(/^krishikranti-/, "kk-");
+                    const handleParts = cleanHandle.split("-");
+                    const prefix = handleParts.slice(0, 3).join("-").toUpperCase();
+
+                    const optionClean = (row["Option1 Value"] || "")
+                        .split(" ")[0]
+                        .replace(/[^a-zA-Z0-9]/g, "")
+                        .toUpperCase();
+
+                    sku = optionClean ? `${prefix}-${optionClean}` : prefix;
+                }
+
                 const variant = {
-                    sku: row["Variant SKU"] || "",
+                    sku: sku,
                     option: row["Option1 Value"] || "",
                     price: row["Variant Price"] || "",
                     compareAtPrice: row["Variant Compare At Price"] || "",
@@ -240,8 +264,18 @@ async function importProducts() {
             // Extract image if present
             if (row["Image Src"]) {
                 const imageUrl = row["Image Src"].trim();
-                if (imageUrl && !groupedProducts[handle].images.includes(imageUrl)) {
-                    groupedProducts[handle].images.push(imageUrl);
+                if (imageUrl) {
+                    const isDuplicate = groupedProducts[handle].images.some(img => 
+                        (typeof img === "string" && img === imageUrl) ||
+                        (img && img.original === imageUrl)
+                    );
+                    if (!isDuplicate) {
+                        groupedProducts[handle].images.push({
+                            original: imageUrl,
+                            medium: "",
+                            low: ""
+                        });
+                    }
                 }
             }
         });

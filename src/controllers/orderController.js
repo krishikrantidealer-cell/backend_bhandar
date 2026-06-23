@@ -52,6 +52,16 @@ const getOrderById = async (req, res) => {
         if (!order) {
             return res.status(404).json({ success: false, message: "Order not found" });
         }
+
+        // Verify that the order belongs to the logged-in user
+        // (Either matching their email or matching their phone number)
+        const isOwner = (order.email && order.email === req.user.email) ||
+            (order.phone && order.phone === req.user.phone);
+
+        if (!isOwner) {
+            return res.status(403).json({ success: false, message: "Forbidden: Access to this order is denied" });
+        }
+
         res.json({ success: true, data: order });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -81,11 +91,36 @@ const getOrdersByCustomer = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-
 // POST /api/orders
 const createOrder = async (req, res) => {
     try {
         const orderData = req.body;
+
+        // Auto-associate with authenticated user details if missing
+        if (req.user) {
+            if (!orderData.phone && req.user.phone) orderData.phone = req.user.phone;
+        }
+
+        // Razorpay signature verification
+        if (orderData.paymentMethod === "Online" || orderData.paymentMethod === "razorpay") {
+            const crypto = require("crypto");
+            const keySecret = process.env.RAZORPAY_KEY_SECRET;
+            if (!orderData.razorpayOrderId || !orderData.razorpayPaymentId || !orderData.razorpaySignature) {
+                return res.status(400).json({ success: false, message: "Missing Razorpay payment parameters" });
+            }
+
+            const expectedSignature = crypto
+                .createHmac("sha256", keySecret)
+                .update(orderData.razorpayOrderId + "|" + orderData.razorpayPaymentId)
+                .digest("hex");
+
+            if (expectedSignature !== orderData.razorpaySignature) {
+                return res.status(400).json({ success: false, message: "Security Alert: Razorpay signature verification failed" });
+            }
+
+            orderData.financialStatus = "paid";
+            orderData.status = "processing";
+        }
 
         // Auto-generate order name (#number) if not provided
         if (!orderData.name) {
@@ -131,4 +166,66 @@ const createOrder = async (req, res) => {
     }
 };
 
-module.exports = { getAllOrders, getOrderById, getOrdersByCustomer, createOrder };
+// POST /api/orders/razorpay
+const createRazorpayOrder = async (req, res) => {
+    try {
+        const { amount } = req.body;
+        if (!amount) {
+            return res.status(400).json({ success: false, message: "Amount is required" });
+        }
+
+        const amountInPaise = Math.round(Number(amount) * 100);
+        const keyId = process.env.RAZORPAY_KEY_ID;
+        const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+        if (!keyId || !keySecret) {
+            return res.status(500).json({ success: false, message: "Razorpay credentials not configured on server" });
+        }
+
+        const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+        const response = await fetch("https://api.razorpay.com/v1/orders", {
+            method: "POST",
+            headers: {
+                "Authorization": `Basic ${auth}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                amount: amountInPaise,
+                currency: "INR",
+                receipt: `rcpt_ORD_${Date.now().toString().slice(-6)}`
+            })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            res.json({ success: true, keyId, order: data });
+        } else {
+            res.status(response.status).json({ success: false, message: data.error ? data.error.description : "Razorpay error" });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+const cancelOrder = async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id);
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Order not found" });
+        }
+        // check ownership
+        const isOwner = (order.email && order.email === req.user.email) ||
+            (order.phone && order.phone === req.user.phone);
+        if (!isOwner) {
+            return res.status(403).json({ success: false, message: "Forbidden" });
+        }
+
+        order.status = "cancelled";
+        order.cancelledAt = new Date();
+        await order.save();
+        res.json({ success: true, data: order });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+module.exports = { getAllOrders, getOrderById, getOrdersByCustomer, createOrder, createRazorpayOrder, cancelOrder };

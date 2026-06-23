@@ -1,22 +1,38 @@
 const express = require("express");
 const router = express.Router();
+const authMiddleware = require("../middleware/auth");
 const {
     getAllOrders,
     getOrderById,
     getOrdersByCustomer,
-    createOrder
+    createOrder,
+    createRazorpayOrder,
+    cancelOrder
 } = require("../controllers/orderController");
 
-// GET /api/orders                     — list all (with pagination, search, status filters)
-router.get("/", getAllOrders);
+// GET /api/orders                     — list all (with pagination, search, status filters, protected)
+router.get("/", authMiddleware, getAllOrders);
 
-// POST /api/orders                    — create a new order
-router.post("/", createOrder);
+// POST /api/orders/razorpay           — create Razorpay order (protected)
+router.post("/razorpay", authMiddleware, createRazorpayOrder);
 
-// GET /api/orders/customer/:emailOrPhone — list orders for a specific customer email or phone
-router.get("/customer/:emailOrPhone", getOrdersByCustomer);
+// POST /api/orders                    — create a new order (protected)
+router.post("/", authMiddleware, createOrder);
 
-// GET /api/orders/:id                 — single order by name (e.g. #18899) or ObjectId
-router.get("/:id", getOrderById);
+// GET /api/orders/customer/:emailOrPhone — list orders for a specific customer (protected, self-access only)
+router.get("/customer/:emailOrPhone", authMiddleware, (req, res, next) => {
+    const { emailOrPhone } = req.params;
+    const decoded = decodeURIComponent(emailOrPhone).trim();
+    if (req.user.phone !== decoded && req.user.email !== decoded) {
+        return res.status(403).json({ success: false, message: "Forbidden: Access to another customer's orders is denied" });
+    }
+    next();
+}, getOrdersByCustomer);
+
+// GET /api/orders/:id                 — single order by name (e.g. #18899) or ObjectId (protected)
+router.get("/:id", authMiddleware, getOrderById);
+
+// POST /api/orders/:id/cancel         — cancel order (protected)
+router.post("/:id/cancel", authMiddleware, cancelOrder);
 
 module.exports = router;

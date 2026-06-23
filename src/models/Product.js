@@ -7,8 +7,7 @@ const VariantSchema = new mongoose.Schema(
         price: { type: String, default: "" },
         compareAtPrice: { type: String, default: "" },
         stock: { type: String, default: "" }
-    },
-    { _id: false }
+    }
 );
 
 const ProductSchema = new mongoose.Schema(
@@ -20,7 +19,14 @@ const ProductSchema = new mongoose.Schema(
         status: { type: String, default: "active" },
         categoryIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Category" }],
         variants: [VariantSchema],
-        images: [{ type: String }],
+        images: [
+            {
+                original: { type: String, default: "" },
+                medium: { type: String, default: "" },
+                low: { type: String, default: "" }
+            }
+        ],
+        buy1get1: { type: Boolean, default: false },
         importedAt: { type: Date, default: Date.now }
     },
     { timestamps: true }
