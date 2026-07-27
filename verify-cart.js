@@ -6,7 +6,7 @@ const Coupon = require("./src/models/Coupon");
 const MONGO_URI =
     "mongodb+srv://krishikrantidealer_db_user:KrishiKranti%402026@krishikranti.tyerpvc.mongodb.net/krishibhandar_db?appName=KrishiKranti";
 
-const CUSTOMER_ID = "7384266997913"; // Ram
+const CUSTOMER_ID = "7384266997913"; // Test Customer ID
 
 async function testCart() {
     try {
@@ -101,7 +101,6 @@ async function testCart() {
         } else {
             console.log("❌ Coupon FIRST20 not found in DB");
         }
-
         await mongoose.connection.close();
         console.log("✅ Verification finished");
         process.exit(0);

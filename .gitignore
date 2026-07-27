@@ -1,7 +1,6 @@
 node_modules/
 .env
 .DS_Store
-shopify-import/node_modules/
 gcs-key.json
 src/ebs-kisan-sewa-87122a079371.json
 

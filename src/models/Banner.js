@@ -24,7 +24,7 @@ const BannerSchema = new mongoose.Schema(
             enum: ["product", "collection", "url", "none"],
             default: "none",
         },
-        // Shopify product handle, collection ID, or any URL depending on linkType
+        // product handle, collection ID, or any URL depending on linkType
         linkValue: { type: String, default: "" },
 
         // Sorting order — lower = shown first

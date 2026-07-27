@@ -15,7 +15,7 @@ const CartItemSchema = new mongoose.Schema(
 
 const CartSchema = new mongoose.Schema(
     {
-        customerId: { type: String, required: true, unique: true, index: true }, // customer _id (Shopify string customer ID)
+        customerId: { type: String, required: true, unique: true, index: true }, // customer _id or phone number
         items: [CartItemSchema],
         couponCode: { type: String, default: "" },
         subtotal: { type: Number, default: 0.0 },

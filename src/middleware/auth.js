@@ -9,20 +9,18 @@ const authMiddleware = async (req, res, next) => {
         }
 
         const token = authHeader.split(" ")[1];
-        const secret = process.env.JWT_SECRET || "krishikranti_super_secure_token_secret_2026";
+        const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "krishikranti_super_secure_token_secret_2026";
 
-        // 1. Verify JWT signature
         const decoded = jwt.verify(token, secret);
 
-        // 2. Verify session exists in Redis
         const redisClient = await getRedisClient();
         const sessionData = await redisClient.get(`session:${token}`);
         if (!sessionData) {
             return res.status(401).json({ success: false, message: "Session expired or logged out" });
         }
 
-        req.user = decoded; // Contains { id, phone }
-        req.token = token;  // Attach token for logout
+        req.user = decoded;
+        req.token = token;
         next();
     } catch (error) {
         return res.status(401).json({ success: false, message: "Invalid or expired token" });

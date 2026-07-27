@@ -19,13 +19,54 @@ const sendOtp = async (req, res) => {
         const redisClient = await getRedisClient();
         await redisClient.setEx(`otp:${cleanPhone}`, 300, code);
 
-        // Mock sending via Airtel IQ - log it to console
-        console.log(`\n📲 [Airtel IQ Mock SMS Gateway] Send OTP ${code} to ${cleanPhone}\n`);
+        // --- Airtel IQ SMS Integration ---
+        const username = process.env.AIRTEL_IQ_USERNAME;
+        const password = process.env.AIRTEL_IQ_PASSWORD;
+        const customerId = process.env.AIRTEL_IQ_CUSTOMER_ID;
+        const dltEntityId = process.env.AIRTEL_IQ_ENTITY_ID;
+        const dltTemplateId = process.env.AIRTEL_IQ_DLT_TEMPLATE_ID;
+        const sourceAddress = process.env.AIRTEL_IQ_SOURCE_ADDRESS;
+        const template = process.env.AIRTEL_IQ_MESSAGE_TEMPLATE || "{otp} is your login OTP for Krishikranti Organics.";
+
+        const message = template.replace("{otp}", code);
+
+        try {
+            if (username && password && customerId) {
+                const auth = Buffer.from(`${username}:${password}`).toString("base64");
+                const response = await fetch("https://iqmessaging.airtel.in/api/v1/sms/send", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Basic ${auth}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        customerId,
+                        destination: [cleanPhone.startsWith("+") ? cleanPhone : `+91${cleanPhone}`],
+                        message,
+                        sourceAddress,
+                        dltEntityId,
+                        dltTemplateId,
+                        messageType: "SERVICE_IMPLICIT"
+                    })
+                });
+
+                if (!response.ok) {
+                    const result = await response.json();
+                    console.error("❌ Airtel IQ SMS Failed:", result);
+                } else {
+                    console.log("✅ SMS sent successfully via Airtel IQ");
+                }
+            } else {
+                console.warn("⚠️ Airtel IQ credentials missing. OTP logged to console.");
+                console.log(`📲 [Mock] Send OTP ${code} to ${cleanPhone}`);
+            }
+        } catch (smsError) {
+            console.error("❌ SMS Gateway Error:", smsError.message);
+        }
 
         res.status(200).json({
             success: true,
-            message: "OTP sent successfully (Mocked)",
-            // Return code for testing ease in non-production
+            message: "OTP sent successfully",
             code: process.env.NODE_ENV !== "production" ? code : undefined
         });
     } catch (error) {
@@ -44,7 +85,6 @@ const verifyOtp = async (req, res) => {
         const cleanPhone = phone.trim();
         const cleanOtp = otp.trim();
 
-        // Check for master OTP or Redis stored OTP
         let otpIsValid = false;
         const redisClient = await getRedisClient();
 
@@ -61,21 +101,14 @@ const verifyOtp = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
         }
 
-        // Check if customer exists in the system
         let customer = await Customer.findOne({ phone: cleanPhone });
 
         if (!customer) {
-            // Auto-register a new customer
-            console.log(`👤 Customer with phone ${cleanPhone} not found. Registering a new customer...`);
-            
-            // Find highest numeric ID string to increment sequentially
             const lastCust = await Customer.findOne({ _id: /^[0-9]+$/ }).sort({ _id: -1 });
-            let nextIdVal = 8000000000000; // Start range for newly registered customers
+            let nextIdVal = 8000000000000;
             if (lastCust) {
                 const num = parseInt(lastCust._id, 10);
-                if (!isNaN(num)) {
-                    nextIdVal = num + 1;
-                }
+                if (!isNaN(num)) nextIdVal = num + 1;
             }
 
             customer = new Customer({
@@ -87,42 +120,29 @@ const verifyOtp = async (req, res) => {
                 status: "active"
             });
             await customer.save();
-            console.log(`✅ Auto-registered customer: ${customer._id}`);
         }
 
-        // Generate JWT Token
-        const jwtSecret = process.env.JWT_SECRET || "krishikranti_super_secure_token_secret_2026";
+        const jwtSecret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "krishikranti_super_secure_token_secret_2026";
         const token = jwt.sign(
             { id: customer._id, phone: customer.phone },
             jwtSecret,
-            { expiresIn: "7d" } // 7-day session token expiration
+            { expiresIn: "7d" }
         );
 
-        // Store the active session in Redis (expires in 7 days / 604800 seconds)
         const sessionData = {
             customerId: customer._id,
             phone: customer.phone,
-            deviceInfo: req.headers["user-agent"] || "",
-            ipAddress: req.ip || "",
             createdAt: new Date().toISOString()
         };
         await redisClient.setEx(`session:${token}`, 604800, JSON.stringify(sessionData));
-
-        // Delete OTP from Redis
         await redisClient.del(`otp:${cleanPhone}`);
 
-        res.status(200).json({
-            success: true,
-            message: "Authentication successful",
-            token,
-            customer
-        });
+        res.status(200).json({ success: true, message: "Authentication successful", token, customer });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// POST /api/auth/logout (protected)
 const logout = async (req, res) => {
     try {
         const token = req.token;
@@ -134,24 +154,18 @@ const logout = async (req, res) => {
     }
 };
 
-// POST /api/auth/logout-all (protected)
 const logoutAll = async (req, res) => {
     try {
         const customerId = req.user.id;
         const redisClient = await getRedisClient();
-
-        // Retrieve all session keys and invalidate matching customer IDs
         const keys = await redisClient.keys("session:*");
         for (const key of keys) {
             const dataStr = await redisClient.get(key);
             if (dataStr) {
                 const data = JSON.parse(dataStr);
-                if (data.customerId === customerId) {
-                    await redisClient.del(key);
-                }
+                if (data.customerId === customerId) await redisClient.del(key);
             }
         }
-
         res.json({ success: true, message: "Logged out from all devices successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
