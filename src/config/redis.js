@@ -23,7 +23,32 @@ const mockClient = {
         }
         return item.value;
     },
-    del: async (key) => mockStore.delete(key) ? 1 : 0,
+    del: async (key) => {
+        return mockStore.delete(key) ? 1 : 0;
+    },
+    sAdd: async (key, ...members) => {
+        let set = mockStore.get(key);
+        if (!set || !(set instanceof Set)) {
+            set = new Set();
+            mockStore.set(key, set);
+        }
+        members.forEach(m => set.add(m));
+        return members.length;
+    },
+    sRem: async (key, ...members) => {
+        const set = mockStore.get(key);
+        if (!set || !(set instanceof Set)) return 0;
+        let count = 0;
+        members.forEach(m => {
+            if (set.delete(m)) count++;
+        });
+        return count;
+    },
+    sMembers: async (key) => {
+        const set = mockStore.get(key);
+        if (!set || !(set instanceof Set)) return [];
+        return Array.from(set);
+    },
     keys: async (pattern) => {
         const cleanPattern = pattern.replace("*", "");
         const matchedKeys = [];

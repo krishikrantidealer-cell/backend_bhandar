@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
+const { authMiddleware, adminMiddleware } = require("../middleware/auth");
 const {
     getBanners,
     createBanner,
@@ -19,20 +20,20 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 // GET /api/banners              → all active banners
 router.get("/", getBanners);
 
-// ─── Admin ───────────────────────────────────────────────────────────────────
+// ─── Admin (Protected: Admin Only) ───────────────────────────────────────────
 // POST /api/banners              → create banner (provide imageUrl manually)
-router.post("/", createBanner);
+router.post("/", authMiddleware, adminMiddleware, createBanner);
 
 // POST /api/banners/upload        → upload image to GCS + create banner
-router.post("/upload", upload.single("image"), uploadBannerImage);
+router.post("/upload", authMiddleware, adminMiddleware, upload.single("image"), uploadBannerImage);
 
 // POST /api/banners/seed          → seed banners with pre-existing imageUrls
-router.post("/seed", seedBanners);
+router.post("/seed", authMiddleware, adminMiddleware, seedBanners);
 
 // PUT  /api/banners/:id           → update banner
-router.put("/:id", updateBanner);
+router.put("/:id", authMiddleware, adminMiddleware, updateBanner);
 
 // DELETE /api/banners/:id         → delete banner
-router.delete("/:id", deleteBanner);
+router.delete("/:id", authMiddleware, adminMiddleware, deleteBanner);
 
 module.exports = router;

@@ -13,7 +13,13 @@ const ADMIN_PHONE = "+919098544263"; // Ram's phone in DB
 
 const request = (options, postData = null) => {
     return new Promise((resolve, reject) => {
-        const req = http.request(options, (res) => {
+        const headers = { ...(options.headers || {}) };
+        let payload = null;
+        if (postData) {
+            payload = JSON.stringify(postData);
+            headers["Content-Length"] = Buffer.byteLength(payload);
+        }
+        const req = http.request({ ...options, headers }, (res) => {
             let data = "";
             res.on("data", chunk => data += chunk);
             res.on("end", () => {
@@ -25,8 +31,8 @@ const request = (options, postData = null) => {
             });
         });
         req.on("error", reject);
-        if (postData) {
-            req.write(JSON.stringify(postData));
+        if (payload) {
+            req.write(payload);
         }
         req.end();
     });
@@ -40,18 +46,6 @@ async function verifyAuth() {
         // Clean up previous test entries in Redis
         const redisClient = await getRedisClient();
         await redisClient.del(`otp:${TEST_PHONE}`);
-
-        const sessionKeys = await redisClient.keys("session:*");
-        for (const key of sessionKeys) {
-            const dataStr = await redisClient.get(key);
-            if (dataStr) {
-                const data = JSON.parse(dataStr);
-                if (data.customerId === TEST_PHONE || data.phone === TEST_PHONE || data.phone === ADMIN_PHONE) {
-                    await redisClient.del(key);
-                }
-            }
-        }
-
         await Customer.deleteMany({ phone: TEST_PHONE });
         await Order.deleteMany({ phone: TEST_PHONE });
 

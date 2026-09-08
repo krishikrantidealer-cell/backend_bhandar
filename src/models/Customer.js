@@ -1,5 +1,18 @@
 const mongoose = require("mongoose");
 
+const CustomerAddressSchema = new mongoose.Schema({
+    name: { type: String, default: "" },
+    street: { type: String, default: "" },
+    address1: { type: String, default: "" },
+    address2: { type: String, default: "" },
+    city: { type: String, default: "" },
+    province: { type: String, default: "" },
+    country: { type: String, default: "India" },
+    zip: { type: String, default: "" },
+    phone: { type: String, default: "" },
+    isDefault: { type: Boolean, default: false }
+});
+
 const CustomerSchema = new mongoose.Schema(
     {
         _id: { type: String, required: true }, // The custom Customer ID as primary key
@@ -14,13 +27,15 @@ const CustomerSchema = new mongoose.Schema(
             address1: { type: String, default: "" },
             address2: { type: String, default: "" },
             city: { type: String, default: "" },
-            province: { type: String, default: "" }, // State/Province code mapped from CSV
-            country: { type: String, default: "" },  // Country code mapped from CSV
+            province: { type: String, default: "" },
+            country: { type: String, default: "" },
             zip: { type: String, default: "" },
             phone: { type: String, default: "" }
         },
+        addresses: [CustomerAddressSchema],
         note: { type: String, default: "" },
         status: { type: String, enum: ["active", "inactive"], default: "active", index: true },
+        role: { type: String, enum: ["customer", "admin"], default: "customer", index: true },
         importedAt: { type: Date, default: Date.now }
     },
     { _id: false, timestamps: true } // disable auto _id creation since we supply it explicitly

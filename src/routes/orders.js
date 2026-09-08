@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const authMiddleware = require("../middleware/auth");
+const { authMiddleware, adminMiddleware } = require("../middleware/auth");
 const {
     getAllOrders,
     getOrderById,
@@ -10,8 +10,8 @@ const {
     cancelOrder
 } = require("../controllers/orderController");
 
-// GET /api/orders                     — list all (with pagination, search, status filters, protected)
-router.get("/", authMiddleware, getAllOrders);
+// GET /api/orders                     — list all (with pagination, search, status filters, protected - admin only)
+router.get("/", authMiddleware, adminMiddleware, getAllOrders);
 
 // POST /api/orders/razorpay           — create Razorpay order (protected)
 router.post("/razorpay", authMiddleware, createRazorpayOrder);
@@ -19,11 +19,11 @@ router.post("/razorpay", authMiddleware, createRazorpayOrder);
 // POST /api/orders                    — create a new order (protected)
 router.post("/", authMiddleware, createOrder);
 
-// GET /api/orders/customer/:emailOrPhone — list orders for a specific customer (protected, self-access only)
+// GET /api/orders/customer/:emailOrPhone — list orders for a specific customer (protected, self-access or admin)
 router.get("/customer/:emailOrPhone", authMiddleware, (req, res, next) => {
     const { emailOrPhone } = req.params;
     const decoded = decodeURIComponent(emailOrPhone).trim();
-    if (req.user.phone !== decoded && req.user.email !== decoded) {
+    if (req.user.role !== "admin" && req.user.phone !== decoded && req.user.email !== decoded) {
         return res.status(403).json({ success: false, message: "Forbidden: Access to another customer's orders is denied" });
     }
     next();

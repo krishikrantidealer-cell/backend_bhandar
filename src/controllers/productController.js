@@ -1,36 +1,61 @@
 const Product = require("../models/Product");
+const mongoose = require("mongoose");
+
+// Helper to determine sort object
+function getSortCriteria(sortParam) {
+    switch (sortParam) {
+        case "price_asc":
+            return { "variants.0.price": 1, importedAt: -1 };
+        case "price_desc":
+            return { "variants.0.price": -1, importedAt: -1 };
+        case "title_asc":
+            return { title: 1 };
+        case "title_desc":
+            return { title: -1 };
+        case "oldest":
+            return { importedAt: 1, createdAt: 1 };
+        case "newest":
+        default:
+            return { importedAt: -1, createdAt: -1 };
+    }
+}
 
 // GET /api/products
-// Query params: ?page=1&limit=20&category=<id>&search=<text>&status=active
+// Query params: ?page=1&limit=20&category=<id>&search=<text>&status=active&sort=price_asc|price_desc|newest|title_asc
 const getAllProducts = async (req, res) => {
     try {
-        const { page = 1, limit = 20, category, search, status, buy1get1 } = req.query;
+        const { page = 1, limit = 20, category, search, status, buy1get1, sort } = req.query;
 
         const filter = {};
         if (category) {
-            if (category === "6a3935cebd6e0cfbef015a6a" || category === "Bio Products") {
-                filter.buy1get1 = true;
-            } else {
-                filter.categoryIds = category;
-            }
+            filter.categoryIds = category;
         }
         if (status) filter.status = status;
-        if (search) filter.$text = { $search: search };
         if (buy1get1 === "true") {
             filter.buy1get1 = true;
         } else if (buy1get1 === "false") {
             filter.buy1get1 = false;
         }
 
+        if (search) {
+            const cleanSearch = search.trim();
+            filter.$or = [
+                { title: { $regex: cleanSearch, $options: "i" } },
+                { vendor: { $regex: cleanSearch, $options: "i" } },
+                { "variants.sku": { $regex: cleanSearch, $options: "i" } }
+            ];
+        }
+
         const skip = (Number(page) - 1) * Number(limit);
+        const sortCriteria = getSortCriteria(sort);
 
         const [products, total] = await Promise.all([
             Product.find(filter)
                 .populate("categoryIds", "name")
-                .sort({ importedAt: -1 })
+                .sort(sortCriteria)
                 .skip(skip)
                 .limit(Number(limit))
-                .select("-bodyHtml"),   // exclude heavy HTML from list view
+                .select("-bodyHtml"),
             Product.countDocuments(filter)
         ]);
 
@@ -49,7 +74,6 @@ const getAllProducts = async (req, res) => {
 // GET /api/products/:handle
 const getProductByHandle = async (req, res) => {
     try {
-        const mongoose = require("mongoose");
         let query = { handle: req.params.handle };
         if (mongoose.Types.ObjectId.isValid(req.params.handle)) {
             query = { _id: req.params.handle };
@@ -69,15 +93,16 @@ const getProductByHandle = async (req, res) => {
 // GET /api/products/category/:categoryId
 const getProductsByCategory = async (req, res) => {
     try {
-        const { page = 1, limit = 20 } = req.query;
+        const { page = 1, limit = 20, sort } = req.query;
         const skip = (Number(page) - 1) * Number(limit);
+        const sortCriteria = getSortCriteria(sort);
 
         const filter = { categoryIds: req.params.categoryId };
 
         const [products, total] = await Promise.all([
             Product.find(filter)
                 .populate("categoryIds", "name")
-                .sort({ importedAt: -1 })
+                .sort(sortCriteria)
                 .skip(skip)
                 .limit(Number(limit))
                 .select("-bodyHtml"),

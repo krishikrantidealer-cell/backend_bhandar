@@ -1,5 +1,6 @@
 const Customer = require("../models/Customer");
 const { getRedisClient } = require("../config/redis");
+const { getNextSequence } = require("../models/Counter");
 const jwt = require("jsonwebtoken");
 
 // POST /api/auth/send-otp
@@ -67,7 +68,7 @@ const sendOtp = async (req, res) => {
         res.status(200).json({
             success: true,
             message: "OTP sent successfully",
-            code: process.env.NODE_ENV !== "production" ? code : undefined
+            code: process.env.NODE_ENV !== "production" || process.env.ALLOW_TEST_OTP === "true" ? code : undefined
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -88,7 +89,8 @@ const verifyOtp = async (req, res) => {
         let otpIsValid = false;
         const redisClient = await getRedisClient();
 
-        if (cleanOtp === "123456") {
+        const isTestEnv = process.env.NODE_ENV !== "production" || process.env.ALLOW_TEST_OTP === "true";
+        if (isTestEnv && cleanOtp === "123456") {
             otpIsValid = true;
         } else {
             const storedOtp = await redisClient.get(`otp:${cleanPhone}`);
@@ -104,12 +106,8 @@ const verifyOtp = async (req, res) => {
         let customer = await Customer.findOne({ phone: cleanPhone });
 
         if (!customer) {
-            const lastCust = await Customer.findOne({ _id: /^[0-9]+$/ }).sort({ _id: -1 });
-            let nextIdVal = 8000000000000;
-            if (lastCust) {
-                const num = parseInt(lastCust._id, 10);
-                if (!isNaN(num)) nextIdVal = num + 1;
-            }
+            console.log(`👤 Customer with phone ${cleanPhone} not found. Registering a new customer...`);
+            const nextIdVal = await getNextSequence("customerId", 8000000000000);
 
             customer = new Customer({
                 _id: nextIdVal.toString(),
@@ -117,6 +115,7 @@ const verifyOtp = async (req, res) => {
                 lastName: "User",
                 phone: cleanPhone,
                 email: "",
+                role: "customer",
                 status: "active"
             });
             await customer.save();
@@ -124,7 +123,7 @@ const verifyOtp = async (req, res) => {
 
         const jwtSecret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "krishikranti_super_secure_token_secret_2026";
         const token = jwt.sign(
-            { id: customer._id, phone: customer.phone },
+            { id: customer._id, phone: customer.phone, role: customer.role || "customer" },
             jwtSecret,
             { expiresIn: "7d" }
         );
@@ -132,9 +131,20 @@ const verifyOtp = async (req, res) => {
         const sessionData = {
             customerId: customer._id,
             phone: customer.phone,
+            role: customer.role || "customer",
+            email: customer.email || "",
+            deviceInfo: req.headers["user-agent"] || "",
+            ipAddress: req.ip || "",
             createdAt: new Date().toISOString()
         };
         await redisClient.setEx(`session:${token}`, 604800, JSON.stringify(sessionData));
+
+        // Track active user token in Redis set for O(1) user logoutAll operations
+        if (redisClient.sAdd) {
+            await redisClient.sAdd(`user_sessions:${customer._id}`, token);
+        }
+
+        // Delete OTP from Redis
         await redisClient.del(`otp:${cleanPhone}`);
 
         res.status(200).json({ success: true, message: "Authentication successful", token, customer });
@@ -143,27 +153,49 @@ const verifyOtp = async (req, res) => {
     }
 };
 
+// POST /api/auth/logout (protected)
 const logout = async (req, res) => {
     try {
         const token = req.token;
+        const customerId = req.user.id;
         const redisClient = await getRedisClient();
+
         await redisClient.del(`session:${token}`);
+        if (redisClient.sRem && customerId) {
+            await redisClient.sRem(`user_sessions:${customerId}`, token);
+        }
+
         res.json({ success: true, message: "Logged out successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
 
+// POST /api/auth/logout-all (protected)
 const logoutAll = async (req, res) => {
     try {
         const customerId = req.user.id;
         const redisClient = await getRedisClient();
-        const keys = await redisClient.keys("session:*");
-        for (const key of keys) {
-            const dataStr = await redisClient.get(key);
-            if (dataStr) {
-                const data = JSON.parse(dataStr);
-                if (data.customerId === customerId) await redisClient.del(key);
+
+        if (redisClient.sMembers) {
+            const activeTokens = await redisClient.sMembers(`user_sessions:${customerId}`);
+            if (activeTokens && activeTokens.length > 0) {
+                for (const tok of activeTokens) {
+                    await redisClient.del(`session:${tok}`);
+                }
+            }
+            await redisClient.del(`user_sessions:${customerId}`);
+        } else {
+            // Fallback
+            const keys = await redisClient.keys("session:*");
+            for (const key of keys) {
+                const dataStr = await redisClient.get(key);
+                if (dataStr) {
+                    const data = JSON.parse(dataStr);
+                    if (data.customerId === customerId) {
+                        await redisClient.del(key);
+                    }
+                }
             }
         }
         res.json({ success: true, message: "Logged out from all devices successfully" });

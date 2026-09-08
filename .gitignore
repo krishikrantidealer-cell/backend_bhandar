@@ -3,5 +3,6 @@ node_modules/
 .DS_Store
 gcs-key.json
 src/ebs-kisan-sewa-87122a079371.json
+.idea/
 
 

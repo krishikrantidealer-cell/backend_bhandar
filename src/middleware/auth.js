@@ -14,17 +14,36 @@ const authMiddleware = async (req, res, next) => {
         const decoded = jwt.verify(token, secret);
 
         const redisClient = await getRedisClient();
-        const sessionData = await redisClient.get(`session:${token}`);
-        if (!sessionData) {
+        const sessionDataStr = await redisClient.get(`session:${token}`);
+        if (!sessionDataStr) {
             return res.status(401).json({ success: false, message: "Session expired or logged out" });
         }
 
-        req.user = decoded;
-        req.token = token;
+        let sessionData = {};
+        try {
+            sessionData = JSON.parse(sessionDataStr);
+        } catch (e) {
+            // fallback if string
+        }
+
+        req.user = {
+            id: decoded.id || sessionData.customerId,
+            phone: decoded.phone || sessionData.phone,
+            email: decoded.email || sessionData.email || "",
+            role: sessionData.role || decoded.role || "customer"
+        };
+        req.token = token;  // Attach token for logout
         next();
     } catch (error) {
         return res.status(401).json({ success: false, message: "Invalid or expired token" });
     }
 };
 
-module.exports = authMiddleware;
+const adminMiddleware = (req, res, next) => {
+    if (!req.user || req.user.role !== "admin") {
+        return res.status(403).json({ success: false, message: "Forbidden: Admin privileges required" });
+    }
+    next();
+};
+
+module.exports = { authMiddleware, adminMiddleware };

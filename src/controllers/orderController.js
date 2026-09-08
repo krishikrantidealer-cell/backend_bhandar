@@ -1,7 +1,96 @@
 const Order = require("../models/Order");
+const Product = require("../models/Product");
+const Coupon = require("../models/Coupon");
+const Cart = require("../models/Cart");
+const Customer = require("../models/Customer");
+const { getNextSequence } = require("../models/Counter");
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 
-// GET /api/orders
+// Helper to verify and calculate order items & totals from DB
+async function calculateOrderTotals(lineItemsInput, couponCodeInput) {
+    let subtotal = 0;
+    const verifiedLineItems = [];
+
+    for (const item of lineItemsInput) {
+        let price = Number(item.price) || 0;
+        let name = item.name || "Item";
+        let sku = item.sku || item.variantSku || "";
+        let productId = item.productId || null;
+        let quantity = Math.max(1, Number(item.quantity) || 1);
+
+        // Authoritative verification against Product database if productId provided
+        if (productId && mongoose.Types.ObjectId.isValid(productId)) {
+            const product = await Product.findById(productId);
+            if (product) {
+                name = product.title;
+                let variant;
+                if (sku) {
+                    variant = product.variants.find(v => v.sku === sku);
+                }
+                if (!variant && item.variantId) {
+                    variant = product.variants.find(v => v._id && v._id.toString() === item.variantId.toString());
+                }
+                if (!variant && product.variants.length > 0) {
+                    variant = product.variants[0];
+                }
+                if (variant) {
+                    price = parseFloat(variant.price) || 0;
+                    sku = variant.sku || sku;
+                }
+            }
+        }
+
+        const itemTotal = price * quantity;
+        subtotal += itemTotal;
+
+        verifiedLineItems.push({
+            productId,
+            name,
+            sku,
+            price,
+            quantity,
+            requiresShipping: item.requiresShipping !== false,
+            taxable: !!item.taxable,
+            fulfillmentStatus: "pending",
+            discount: Number(item.discount) || 0
+        });
+    }
+
+    // Coupon verification
+    let discountAmount = 0;
+    let validCouponCode = "";
+    if (couponCodeInput) {
+        const coupon = await Coupon.findOne({ code: couponCodeInput.toUpperCase().trim() });
+        if (coupon && coupon.status === "active") {
+            const now = new Date();
+            const startValid = coupon.startDate <= now;
+            const endValid = !coupon.endDate || coupon.endDate >= now;
+
+            if (startValid && endValid && subtotal >= coupon.minimumPurchase) {
+                if (coupon.valueType === "percentage") {
+                    discountAmount = subtotal * (coupon.value / 100);
+                } else if (coupon.valueType === "fixed_amount") {
+                    discountAmount = coupon.value;
+                }
+                if (discountAmount > subtotal) discountAmount = subtotal;
+                validCouponCode = coupon.code;
+            }
+        }
+    }
+
+    const total = Math.max(0, subtotal - discountAmount);
+
+    return {
+        subtotal,
+        discountAmount,
+        total,
+        validCouponCode,
+        verifiedLineItems
+    };
+}
+
+// GET /api/orders (Protected: Admin Only)
 // Query params: ?page=1&limit=20&search=<text>&financialStatus=<status>&fulfillmentStatus=<status>
 const getAllOrders = async (req, res) => {
     try {
@@ -35,7 +124,7 @@ const getAllOrders = async (req, res) => {
 };
 
 // GET /api/orders/:id
-// Can query by order name (e.g. #18899) or MongoDB ObjectId
+// Protected: Accessible to Order Owner or Admin
 const getOrderById = async (req, res) => {
     try {
         const { id } = req.params;
@@ -44,7 +133,6 @@ const getOrderById = async (req, res) => {
         if (mongoose.Types.ObjectId.isValid(id)) {
             order = await Order.findById(id);
         } else {
-            // Encode/decode just in case of special characters like '#'
             const decodedId = decodeURIComponent(id);
             order = await Order.findOne({ name: decodedId });
         }
@@ -53,12 +141,11 @@ const getOrderById = async (req, res) => {
             return res.status(404).json({ success: false, message: "Order not found" });
         }
 
-        // Verify that the order belongs to the logged-in user
-        // (Either matching their email or matching their phone number)
+        const isAdmin = req.user && req.user.role === "admin";
         const isOwner = (order.email && order.email === req.user.email) ||
             (order.phone && order.phone === req.user.phone);
 
-        if (!isOwner) {
+        if (!isAdmin && !isOwner) {
             return res.status(403).json({ success: false, message: "Forbidden: Access to this order is denied" });
         }
 
@@ -69,12 +156,12 @@ const getOrderById = async (req, res) => {
 };
 
 // GET /api/orders/customer/:emailOrPhone
+// Protected: Accessible to Self or Admin
 const getOrdersByCustomer = async (req, res) => {
     try {
         const { emailOrPhone } = req.params;
         const decoded = decodeURIComponent(emailOrPhone).trim();
 
-        // Search by email OR phone number
         const filter = {
             $or: [
                 { email: decoded },
@@ -91,90 +178,31 @@ const getOrdersByCustomer = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-// POST /api/orders
-const createOrder = async (req, res) => {
-    try {
-        const orderData = req.body;
-
-        // Auto-associate with authenticated user details if missing
-        if (req.user) {
-            if (!orderData.phone && req.user.phone) orderData.phone = req.user.phone;
-        }
-
-        // Razorpay signature verification
-        if (orderData.paymentMethod === "Online" || orderData.paymentMethod === "razorpay") {
-            const crypto = require("crypto");
-            const keySecret = process.env.RAZORPAY_KEY_SECRET;
-            if (!orderData.razorpayOrderId || !orderData.razorpayPaymentId || !orderData.razorpaySignature) {
-                return res.status(400).json({ success: false, message: "Missing Razorpay payment parameters" });
-            }
-
-            const expectedSignature = crypto
-                .createHmac("sha256", keySecret)
-                .update(orderData.razorpayOrderId + "|" + orderData.razorpayPaymentId)
-                .digest("hex");
-
-            if (expectedSignature !== orderData.razorpaySignature) {
-                return res.status(400).json({ success: false, message: "Security Alert: Razorpay signature verification failed" });
-            }
-
-            orderData.financialStatus = "paid";
-            orderData.status = "processing";
-        }
-
-        // Auto-generate order name (#number) if not provided
-        if (!orderData.name) {
-            const orders = await Order.find({ name: /^#/ }).select("name");
-            let nextNum = 19000;
-            if (orders.length > 0) {
-                const nums = orders
-                    .map(o => parseInt(o.name.replace("#", ""), 10))
-                    .filter(n => !isNaN(n));
-                if (nums.length > 0) {
-                    nextNum = Math.max(...nums) + 1;
-                }
-            }
-            orderData.name = `#${nextNum}`;
-        }
-
-        // Derive order status if not explicitly provided
-        if (!orderData.status) {
-            if (orderData.cancelledAt) {
-                orderData.status = "cancelled";
-            } else if ((orderData.financialStatus || "").toLowerCase() === "refunded") {
-                orderData.status = "refunded";
-            } else if ((orderData.fulfillmentStatus || "").toLowerCase() === "fulfilled") {
-                orderData.status = "completed";
-            } else if ((orderData.financialStatus || "").toLowerCase() === "paid") {
-                orderData.status = "processing";
-            } else {
-                orderData.status = "pending";
-            }
-        }
-
-        // Set default timestamps
-        if (!orderData.createdAt) {
-            orderData.createdAt = new Date();
-        }
-
-        const newOrder = new Order(orderData);
-        await newOrder.save();
-
-        res.status(201).json({ success: true, data: newOrder });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-};
 
 // POST /api/orders/razorpay
+// Protected: Generates Razorpay Order using server-verified cart amount
 const createRazorpayOrder = async (req, res) => {
     try {
-        const { amount } = req.body;
-        if (!amount) {
-            return res.status(400).json({ success: false, message: "Amount is required" });
+        let amountToCharge = 0;
+
+        // 1. If explicit lineItems/cart passed or fetch from customer's active cart in DB
+        let cart = await Cart.findOne({ customerId: req.user.id });
+        if (cart && cart.items && cart.items.length > 0) {
+            const { total } = await calculateOrderTotals(cart.items, cart.couponCode);
+            amountToCharge = total;
+        } else if (req.body.lineItems && req.body.lineItems.length > 0) {
+            const { total } = await calculateOrderTotals(req.body.lineItems, req.body.couponCode);
+            amountToCharge = total;
+        } else if (req.body.amount && Number(req.body.amount) > 0) {
+            // Fallback for custom amounts if no cart items
+            amountToCharge = Number(req.body.amount);
         }
 
-        const amountInPaise = Math.round(Number(amount) * 100);
+        if (!amountToCharge || amountToCharge <= 0) {
+            return res.status(400).json({ success: false, message: "Invalid order amount or empty cart" });
+        }
+
+        const amountInPaise = Math.round(amountToCharge * 100);
         const keyId = process.env.RAZORPAY_KEY_ID;
         const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
@@ -198,7 +226,7 @@ const createRazorpayOrder = async (req, res) => {
 
         const data = await response.json();
         if (response.ok) {
-            res.json({ success: true, keyId, order: data });
+            res.json({ success: true, keyId, order: data, amount: amountToCharge });
         } else {
             res.status(response.status).json({ success: false, message: data.error ? data.error.description : "Razorpay error" });
         }
@@ -206,23 +234,183 @@ const createRazorpayOrder = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+// POST /api/orders
+// Protected: Server-side verified price calculation, atomic order number, stock update, and cart clearance
+const createOrder = async (req, res) => {
+    try {
+        const orderData = req.body;
+
+        // Auto-associate authenticated user phone/email
+        if (req.user) {
+            if (!orderData.phone && req.user.phone) orderData.phone = req.user.phone;
+            if (!orderData.email && req.user.email) orderData.email = req.user.email;
+        }
+
+        // Determine line items: from body or from customer's active Cart
+        let itemsToProcess = orderData.lineItems;
+        let couponCodeToApply = orderData.couponCode || "";
+
+        if (!itemsToProcess || itemsToProcess.length === 0) {
+            const customerCart = await Cart.findOne({ customerId: req.user.id });
+            if (customerCart && customerCart.items.length > 0) {
+                itemsToProcess = customerCart.items;
+                couponCodeToApply = customerCart.couponCode || couponCodeToApply;
+            }
+        }
+
+        if (!itemsToProcess || itemsToProcess.length === 0) {
+            return res.status(400).json({ success: false, message: "Cannot create order with empty line items" });
+        }
+
+        // 1. Server-side authoritative calculation
+        const {
+            subtotal,
+            discountAmount,
+            total,
+            verifiedLineItems
+        } = await calculateOrderTotals(itemsToProcess, couponCodeToApply);
+
+        orderData.lineItems = verifiedLineItems;
+        orderData.subtotal = subtotal;
+        orderData.discountAmount = discountAmount;
+        orderData.total = total;
+
+        // 2. Razorpay signature verification
+        if (orderData.paymentMethod === "Online" || orderData.paymentMethod === "razorpay") {
+            const keySecret = process.env.RAZORPAY_KEY_SECRET;
+            if (!orderData.razorpayOrderId || !orderData.razorpayPaymentId || !orderData.razorpaySignature) {
+                return res.status(400).json({ success: false, message: "Missing Razorpay payment parameters" });
+            }
+
+            if (!keySecret) {
+                return res.status(500).json({ success: false, message: "Razorpay secret key not configured on server" });
+            }
+
+            const expectedSignature = crypto
+                .createHmac("sha256", keySecret)
+                .update(orderData.razorpayOrderId + "|" + orderData.razorpayPaymentId)
+                .digest("hex");
+
+            if (expectedSignature !== orderData.razorpaySignature) {
+                return res.status(400).json({ success: false, message: "Security Alert: Razorpay signature verification failed" });
+            }
+
+            orderData.financialStatus = "paid";
+            orderData.status = "processing";
+        }
+
+        // 3. Atomically generate order name (#seq) without table scans
+        if (!orderData.name) {
+            const nextSeq = await getNextSequence("orderNumber", 19000);
+            orderData.name = `#${nextSeq}`;
+        }
+
+        // 4. Derive status
+        if (!orderData.status) {
+            if (orderData.cancelledAt) {
+                orderData.status = "cancelled";
+            } else if ((orderData.financialStatus || "").toLowerCase() === "refunded") {
+                orderData.status = "refunded";
+            } else if ((orderData.fulfillmentStatus || "").toLowerCase() === "fulfilled") {
+                orderData.status = "completed";
+            } else if ((orderData.financialStatus || "").toLowerCase() === "paid") {
+                orderData.status = "processing";
+            } else {
+                orderData.status = "pending";
+            }
+        }
+
+        if (!orderData.createdAt) {
+            orderData.createdAt = new Date();
+        }
+
+        // 5. Save order
+        const newOrder = new Order(orderData);
+        await newOrder.save();
+
+        // 6. Safely decrement stock for products
+        for (const item of verifiedLineItems) {
+            if (item.productId && item.sku) {
+                try {
+                    const product = await Product.findById(item.productId);
+                    if (product && product.variants) {
+                        const vIndex = product.variants.findIndex(v => v.sku === item.sku);
+                        if (vIndex > -1) {
+                            const currentStock = parseInt(product.variants[vIndex].stock, 10) || 0;
+                            product.variants[vIndex].stock = Math.max(0, currentStock - item.quantity);
+                            await product.save();
+                        }
+                    }
+                } catch (stockErr) {
+                    console.error("Stock decrement error:", stockErr.message);
+                }
+            }
+        }
+
+        // 7. Clear user's cart in DB
+        if (req.user && req.user.id) {
+            await Cart.findOneAndUpdate(
+                { customerId: req.user.id },
+                { items: [], couponCode: "", subtotal: 0, discountAmount: 0, total: 0 }
+            );
+
+            // Update customer totalSpent & totalOrders
+            await Customer.findByIdAndUpdate(req.user.id, {
+                $inc: { totalOrders: 1, totalSpent: total }
+            });
+        }
+
+        res.status(201).json({ success: true, data: newOrder });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// POST /api/orders/:id/cancel
 const cancelOrder = async (req, res) => {
     try {
         const order = await Order.findById(req.params.id);
         if (!order) {
             return res.status(404).json({ success: false, message: "Order not found" });
         }
-        // check ownership
+
+        const isAdmin = req.user && req.user.role === "admin";
         const isOwner = (order.email && order.email === req.user.email) ||
             (order.phone && order.phone === req.user.phone);
-        if (!isOwner) {
-            return res.status(403).json({ success: false, message: "Forbidden" });
+
+        if (!isAdmin && !isOwner) {
+            return res.status(403).json({ success: false, message: "Forbidden: Access to cancel this order is denied" });
+        }
+
+        if (order.status === "cancelled") {
+            return res.status(400).json({ success: false, message: "Order is already cancelled" });
         }
 
         order.status = "cancelled";
         order.cancelledAt = new Date();
         await order.save();
-        res.json({ success: true, data: order });
+
+        // Restore stock
+        for (const item of order.lineItems) {
+            if (item.productId && item.sku) {
+                try {
+                    const product = await Product.findById(item.productId);
+                    if (product && product.variants) {
+                        const vIndex = product.variants.findIndex(v => v.sku === item.sku);
+                        if (vIndex > -1) {
+                            const currentStock = parseInt(product.variants[vIndex].stock, 10) || 0;
+                            product.variants[vIndex].stock = currentStock + item.quantity;
+                            await product.save();
+                        }
+                    }
+                } catch (stockErr) {
+                    console.error("Stock restore error:", stockErr.message);
+                }
+            }
+        }
+
+        res.json({ success: true, message: "Order cancelled successfully", data: order });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
