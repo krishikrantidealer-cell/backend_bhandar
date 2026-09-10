@@ -36,6 +36,7 @@ const CustomerSchema = new mongoose.Schema(
         note: { type: String, default: "" },
         status: { type: String, enum: ["active", "inactive"], default: "active", index: true },
         role: { type: String, enum: ["customer", "admin"], default: "customer", index: true },
+        isprofilecompleted: { type: Boolean, default: false, index: true },
         importedAt: { type: Date, default: Date.now }
     },
     { _id: false, timestamps: true } // disable auto _id creation since we supply it explicitly

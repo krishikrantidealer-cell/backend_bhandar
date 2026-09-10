@@ -80,6 +80,14 @@ const updateCustomer = async (req, res) => {
         if (email !== undefined) customer.email = email.trim();
         if (note !== undefined) customer.note = note.trim();
         if (defaultAddress !== undefined) customer.defaultAddress = defaultAddress;
+        if (req.body.isprofilecompleted !== undefined) {
+            customer.isprofilecompleted = Boolean(req.body.isprofilecompleted);
+        } else {
+            const hasName = Boolean((customer.firstName || '').trim() || (customer.lastName || '').trim());
+            const hasPhone = Boolean((customer.phone || '').trim());
+            const hasAddr = Boolean(customer.defaultAddress && (customer.defaultAddress.address1 || customer.defaultAddress.city || customer.defaultAddress.zip));
+            customer.isprofilecompleted = Boolean(hasName && hasPhone && hasAddr);
+        }
 
         // If admin, can also update role/status
         if (req.user.role === "admin") {
