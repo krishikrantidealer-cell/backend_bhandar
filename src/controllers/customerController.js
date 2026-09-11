@@ -26,7 +26,8 @@ const getAllCustomers = async (req, res) => {
             total,
             page: Number(page),
             pages: Math.ceil(total / Number(limit)),
-            data: customers
+            data: customers,
+            customers
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -41,7 +42,7 @@ const getCurrentCustomer = async (req, res) => {
         if (!customer) {
             return res.status(404).json({ success: false, message: "Customer profile not found" });
         }
-        res.json({ success: true, data: customer });
+        res.json({ success: true, data: customer, customer });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -57,7 +58,7 @@ const getCustomerById = async (req, res) => {
         if (!customer) {
             return res.status(404).json({ success: false, message: "Customer not found" });
         }
-        res.json({ success: true, data: customer });
+        res.json({ success: true, data: customer, customer });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -68,7 +69,7 @@ const getCustomerById = async (req, res) => {
 const updateCustomer = async (req, res) => {
     try {
         const { id } = req.params;
-        const { firstName, lastName, email, defaultAddress, note } = req.body;
+        const { firstName, lastName, name, email, defaultAddress, address, note } = req.body;
 
         const customer = await Customer.findById(id);
         if (!customer) {
@@ -77,26 +78,41 @@ const updateCustomer = async (req, res) => {
 
         if (firstName !== undefined) customer.firstName = firstName.trim();
         if (lastName !== undefined) customer.lastName = lastName.trim();
+        if (name !== undefined) {
+            customer.name = name.trim();
+            if (!customer.firstName && !customer.lastName) {
+                const parts = name.trim().split(" ");
+                customer.firstName = parts[0] || "";
+                customer.lastName = parts.slice(1).join(" ") || "";
+            }
+        }
         if (email !== undefined) customer.email = email.trim();
         if (note !== undefined) customer.note = note.trim();
         if (defaultAddress !== undefined) customer.defaultAddress = defaultAddress;
-        if (req.body.isprofilecompleted !== undefined) {
-            customer.isprofilecompleted = Boolean(req.body.isprofilecompleted);
+        if (address !== undefined && !defaultAddress) customer.defaultAddress = address;
+
+        // Explicit or automatic isProfileCompleted flag setting
+        if (req.body.isprofilecompleted !== undefined || req.body.isProfileCompleted !== undefined) {
+            const val = Boolean(req.body.isprofilecompleted ?? req.body.isProfileCompleted);
+            customer.isprofilecompleted = val;
+            customer.isProfileCompleted = val;
         } else {
-            const hasName = Boolean((customer.firstName || '').trim() || (customer.lastName || '').trim());
+            const hasName = Boolean((customer.firstName || '').trim() || (customer.lastName || '').trim() || (customer.name || '').trim());
             const hasPhone = Boolean((customer.phone || '').trim());
             const hasAddr = Boolean(customer.defaultAddress && (customer.defaultAddress.address1 || customer.defaultAddress.city || customer.defaultAddress.zip));
-            customer.isprofilecompleted = Boolean(hasName && hasPhone && hasAddr);
+            const val = Boolean(hasName && hasPhone && hasAddr);
+            customer.isprofilecompleted = val;
+            customer.isProfileCompleted = val;
         }
 
         // If admin, can also update role/status
-        if (req.user.role === "admin") {
+        if (req.user && req.user.role === "admin") {
             if (req.body.role) customer.role = req.body.role;
             if (req.body.status) customer.status = req.body.status;
         }
 
         await customer.save();
-        res.json({ success: true, message: "Profile updated successfully", data: customer });
+        res.json({ success: true, message: "Profile updated successfully", data: customer, customer });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -114,7 +130,7 @@ const addCustomerAddress = async (req, res) => {
             return res.status(404).json({ success: false, message: "Customer not found" });
         }
 
-        if (addressData.isDefault) {
+        if (addressData.isDefault || !customer.defaultAddress || !customer.defaultAddress.address1) {
             customer.addresses.forEach(a => a.isDefault = false);
             customer.defaultAddress = {
                 company: addressData.company || "",
@@ -123,15 +139,25 @@ const addCustomerAddress = async (req, res) => {
                 city: addressData.city || "",
                 province: addressData.province || "",
                 country: addressData.country || "India",
-                zip: addressData.zip || "",
+                zip: addressData.zip || addressData.pincode || "",
                 phone: addressData.phone || customer.phone
             };
         }
 
         customer.addresses.push(addressData);
+
+        // Mark as profile completed once address is added
+        customer.isprofilecompleted = true;
+        customer.isProfileCompleted = true;
+
         await customer.save();
 
-        res.status(201).json({ success: true, message: "Address added successfully", data: customer.addresses });
+        res.status(201).json({
+            success: true,
+            message: "Address added successfully",
+            data: customer.addresses,
+            customer
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

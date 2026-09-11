@@ -1,10 +1,27 @@
 const mongoose = require("mongoose");
 
+const SubCategorySchema = new mongoose.Schema({
+    name: { type: String, required: true, trim: true },
+    bannerImage: { type: String, trim: true },
+    bannerTitle: { type: String, trim: true }
+});
+
 const CategorySchema = new mongoose.Schema(
     {
-        name: { type: String, required: true, unique: true, trim: true }
+        name: { type: String, required: true, trim: true },
+        title: { type: String, trim: true },
+        slug: { type: String, trim: true },
+        handle: { type: String, trim: true },
+        description: { type: String, default: "" },
+        imageUrl: { type: String, default: "" },
+        image: { type: mongoose.Schema.Types.Mixed },
+        bannerImage: { type: String, default: "" },
+        bannerTitle: { type: String, default: "" },
+        iconImage: { type: String, default: "" },
+        cataloguePdf: { type: String, default: "" },
+        subCategories: [SubCategorySchema]
     },
-    { timestamps: true }
+    { timestamps: true, strict: false }
 );
 
 module.exports = mongoose.model("Category", CategorySchema, "categories");

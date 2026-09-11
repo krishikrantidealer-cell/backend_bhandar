@@ -1,0 +1,24 @@
+const mongoose = require("mongoose");
+
+const SubCollectionSchema = new mongoose.Schema({
+    name: { type: String, required: true, trim: true },
+    slug: { type: String, required: true, lowercase: true, trim: true },
+    isActive: { type: Boolean, default: true },
+    image: { type: String, trim: true }
+});
+
+const CollectionSchema = new mongoose.Schema(
+    {
+        name: { type: String, required: true, trim: true },
+        slug: { type: String, required: true, lowercase: true, trim: true },
+        description: { type: String, trim: true },
+        bannerImage: { type: String, trim: true },
+        bannerTitle: { type: String, trim: true },
+        isActive: { type: Boolean, default: true },
+        priority: { type: Number, default: 0 },
+        subCollections: [SubCollectionSchema]
+    },
+    { timestamps: true, strict: false }
+);
+
+module.exports = mongoose.model("Collection", CollectionSchema, "collections");

@@ -2,6 +2,7 @@ const Customer = require("../models/Customer");
 const { getRedisClient } = require("../config/redis");
 const { getNextSequence } = require("../models/Counter");
 const jwt = require("jsonwebtoken");
+const { model } = require("mongoose");
 
 // POST /api/auth/send-otp
 const sendOtp = async (req, res) => {
@@ -205,3 +206,4 @@ const logoutAll = async (req, res) => {
 };
 
 module.exports = { sendOtp, verifyOtp, logout, logoutAll };
+
