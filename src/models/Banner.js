@@ -21,7 +21,7 @@ const BannerSchema = new mongoose.Schema(
         // What happens when the user taps the banner
         linkType: {
             type: String,
-            enum: ["product", "collection", "url", "none"],
+            enum: ["product", "collection", "category", "url", "none"],
             default: "none",
         },
         // product handle, collection ID, or any URL depending on linkType
