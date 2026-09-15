@@ -144,6 +144,7 @@ const addCustomerAddress = async (req, res) => {
             };
         }
 
+
         customer.addresses.push(addressData);
 
         // Mark as profile completed once address is added
