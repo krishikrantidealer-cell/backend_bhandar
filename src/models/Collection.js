@@ -21,4 +21,7 @@ const CollectionSchema = new mongoose.Schema(
     { timestamps: true, strict: false }
 );
 
+CollectionSchema.index({ slug: 1 });
+CollectionSchema.index({ isActive: 1, priority: -1 });
+
 module.exports = mongoose.model("Collection", CollectionSchema, "collections");

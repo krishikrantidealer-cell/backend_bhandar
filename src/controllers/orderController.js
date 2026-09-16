@@ -416,4 +416,83 @@ const cancelOrder = async (req, res) => {
     }
 };
 
-module.exports = { getAllOrders, getOrderById, getOrdersByCustomer, createOrder, createRazorpayOrder, cancelOrder };
+
+// POST /api/orders/webhook or /api/webhooks/razorpay
+// Zero-loss payment webhook handler for Razorpay
+const handleRazorpayWebhook = async (req, res) => {
+    try {
+        const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET;
+        const signature = req.headers["x-razorpay-signature"];
+
+        if (webhookSecret && signature) {
+            const shasum = crypto.createHmac("sha256", webhookSecret);
+            shasum.update(typeof req.body === "string" ? req.body : JSON.stringify(req.body));
+            const digest = shasum.digest("hex");
+            if (digest !== signature) {
+                console.warn("⚠️ Razorpay Webhook Signature Mismatch");
+                return res.status(400).json({ success: false, message: "Invalid webhook signature" });
+            }
+        }
+
+        const event = req.body?.event;
+        const payload = req.body?.payload;
+
+        if (!event || !payload) {
+            return res.status(200).json({ status: "ok", message: "Ignored empty payload" });
+        }
+
+        console.log(`🔔 [Razorpay Webhook] Received event: ${event}`);
+
+        if (event === "payment.captured" || event === "order.paid") {
+            const paymentEntity = payload.payment?.entity;
+            const razorpayOrderId = paymentEntity?.order_id;
+            const razorpayPaymentId = paymentEntity?.id;
+
+            if (razorpayOrderId || razorpayPaymentId) {
+                const order = await Order.findOne({
+                    $or: [
+                        { razorpayOrderId: razorpayOrderId },
+                        { razorpayPaymentId: razorpayPaymentId }
+                    ]
+                });
+
+                if (order) {
+                    let shouldSave = false;
+                    if (order.financialStatus !== "paid") {
+                        order.financialStatus = "paid";
+                        order.status = "processing";
+                        shouldSave = true;
+                    }
+                    if (razorpayPaymentId && (!order.razorpayPaymentId || order.razorpayPaymentId !== razorpayPaymentId)) {
+                        order.razorpayPaymentId = razorpayPaymentId;
+                        shouldSave = true;
+                    }
+                    if (shouldSave) {
+                        await order.save();
+                        console.log(`✅ [Razorpay Webhook] Updated order ${order.name} to paid.`);
+                    }
+                }
+            }
+        } else if (event === "payment.failed") {
+            const paymentEntity = payload.payment?.entity;
+            const razorpayOrderId = paymentEntity?.order_id;
+
+            if (razorpayOrderId) {
+                const order = await Order.findOne({ razorpayOrderId });
+                if (order && order.financialStatus !== "paid") {
+                    order.financialStatus = "failed";
+                    await order.save();
+                    console.log(`❌ [Razorpay Webhook] Marked order ${order.name} payment as failed.`);
+                }
+            }
+        }
+
+        res.status(200).json({ status: "ok" });
+    } catch (error) {
+        console.error("Razorpay webhook error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+module.exports = { getAllOrders, getOrderById, getOrdersByCustomer, createOrder, createRazorpayOrder, cancelOrder, handleRazorpayWebhook };
+

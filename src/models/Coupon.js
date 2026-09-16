@@ -16,5 +16,6 @@ const CouponSchema = new mongoose.Schema(
 
 // Search Index
 CouponSchema.index({ code: "text" });
+CouponSchema.index({ status: 1, startDate: 1, endDate: 1 });
 
 module.exports = mongoose.model("Coupon", CouponSchema, "coupons");

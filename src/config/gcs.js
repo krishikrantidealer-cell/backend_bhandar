@@ -16,7 +16,7 @@ try {
     console.error("❌ Failed to initialize Google Cloud Storage client:", error.message);
 }
 
-const bucket = storage ? storage.bucket(bucketName) : null;
+const bucket = storage && bucketName ? storage.bucket(bucketName) : null;
 
 /**
  * Uploads a file buffer to Google Cloud Storage.

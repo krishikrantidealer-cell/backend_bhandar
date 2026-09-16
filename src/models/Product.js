@@ -42,4 +42,13 @@ const ProductSchema = new mongoose.Schema(
 // Text index for search
 ProductSchema.index({ title: "text", vendor: "text" });
 
+// Compound & Performance Indexes
+ProductSchema.index({ status: 1, createdAt: -1 });
+ProductSchema.index({ categoryId: 1, status: 1 });
+ProductSchema.index({ categoryIds: 1, status: 1 });
+ProductSchema.index({ assignedCollections: 1, status: 1 });
+ProductSchema.index({ "variants.sku": 1 });
+ProductSchema.index({ tags: 1 });
+ProductSchema.index({ buy1get1: 1, status: 1 });
+
 module.exports = mongoose.model("Product", ProductSchema, "products");

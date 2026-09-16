@@ -6,6 +6,25 @@ const Coupon = require("../models/Coupon");
 async function recalculateCart(cart) {
     let subtotal = 0;
     for (const item of cart.items) {
+        // Refresh product price dynamically if product exists
+        if (item.productId) {
+            try {
+                const product = await Product.findById(item.productId);
+                if (product && product.variants) {
+                    let variant;
+                    if (item.variantId) {
+                        variant = product.variants.find(v => v._id && v._id.toString() === item.variantId.toString());
+                    } else if (item.variantSku) {
+                        variant = product.variants.find(v => v.sku === item.variantSku);
+                    }
+                    if (variant && variant.price) {
+                        item.price = parseFloat(variant.price) || item.price;
+                    }
+                }
+            } catch (pErr) {
+                // Keep existing price if query fails
+            }
+        }
         subtotal += item.price * item.quantity;
     }
     cart.subtotal = subtotal;

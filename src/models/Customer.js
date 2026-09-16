@@ -47,4 +47,10 @@ const CustomerSchema = new mongoose.Schema(
 // Search index
 CustomerSchema.index({ firstName: "text", lastName: "text", email: "text", phone: "text" });
 
+// Performance Indexes
+CustomerSchema.index({ phone: 1 });
+CustomerSchema.index({ email: 1 });
+CustomerSchema.index({ status: 1, role: 1 });
+CustomerSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model("Customer", CustomerSchema, "customers");
