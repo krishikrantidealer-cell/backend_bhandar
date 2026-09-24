@@ -19,8 +19,8 @@ const CustomerSchema = new mongoose.Schema(
         firstName: { type: String, default: "", trim: true },
         lastName: { type: String, default: "", trim: true },
         name: { type: String, default: "", trim: true },
-        email: { type: String, default: "", index: true, trim: true },
-        phone: { type: String, default: "", index: true, trim: true },
+        email: { type: String, default: "", trim: true },
+        phone: { type: String, default: "", trim: true },
         totalSpent: { type: Number, default: 0.0 },
         totalOrders: { type: Number, default: 0 },
         defaultAddress: {
@@ -37,6 +37,7 @@ const CustomerSchema = new mongoose.Schema(
         note: { type: String, default: "" },
         status: { type: String, enum: ["active", "inactive"], default: "active", index: true },
         role: { type: String, enum: ["customer", "admin"], default: "customer", index: true },
+        password: { type: String, default: null },
         isprofilecompleted: { type: Boolean, default: false, index: true },
         isProfileCompleted: { type: Boolean, default: false, index: true },
         importedAt: { type: Date, default: Date.now }

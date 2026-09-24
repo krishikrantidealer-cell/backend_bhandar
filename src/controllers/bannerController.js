@@ -1,6 +1,11 @@
 const Banner = require("../models/Banner");
 const { uploadToGCS } = require("../config/gcs");
-const sharp = require("sharp");
+let sharp;
+try {
+    sharp = require("sharp");
+} catch (e) {
+    // Sharp might require Node >= 20 on certain platforms
+}
 const fs = require("fs");
 const path = require("path");
 
