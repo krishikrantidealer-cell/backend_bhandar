@@ -10,6 +10,7 @@ const couponRoutes = require("./routes/coupons");
 const cartRoutes = require("./routes/cart");
 const authRoutes = require("./routes/auth");
 const bannerRoutes = require("./routes/banners");
+const dashboardRoutes = require("./routes/dashboard");
 const { handleRazorpayWebhook } = require("./controllers/orderController");
 
 const app = express();
@@ -28,6 +29,7 @@ app.use("/api/coupons", couponRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/banners", bannerRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 app.post("/api/webhooks/razorpay", handleRazorpayWebhook);
 
 // ===== Health Check =====

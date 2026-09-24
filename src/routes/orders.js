@@ -8,11 +8,15 @@ const {
     createOrder,
     createRazorpayOrder,
     cancelOrder,
-    handleRazorpayWebhook
+    handleRazorpayWebhook,
+    updateOrderStatus
 } = require("../controllers/orderController");
 
 // GET /api/orders                     — list all (with pagination, search, status filters, protected - admin only)
 router.get("/", authMiddleware, adminMiddleware, getAllOrders);
+
+// PUT /api/orders/:id                 — update order status / notes (protected - admin only)
+router.put("/:id", authMiddleware, adminMiddleware, updateOrderStatus);
 
 // POST /api/orders/webhook           — Razorpay Webhook handler (public callback with signature verification)
 router.post("/webhook", handleRazorpayWebhook);

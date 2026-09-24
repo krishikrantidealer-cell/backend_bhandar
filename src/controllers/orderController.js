@@ -494,5 +494,45 @@ const handleRazorpayWebhook = async (req, res) => {
     }
 };
 
-module.exports = { getAllOrders, getOrderById, getOrdersByCustomer, createOrder, createRazorpayOrder, cancelOrder, handleRazorpayWebhook };
+// PUT /api/orders/:id (Admin: update order status/fulfillment)
+const updateOrderStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, financialStatus, fulfillmentStatus, notes } = req.body;
+
+        let query = {};
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            query = { _id: new mongoose.Types.ObjectId(id) };
+        } else {
+            const decodedId = decodeURIComponent(id);
+            query = { name: decodedId };
+        }
+
+        const updateFields = {};
+        if (status) updateFields.status = status;
+        if (financialStatus) updateFields.financialStatus = financialStatus;
+        if (fulfillmentStatus) updateFields.fulfillmentStatus = fulfillmentStatus;
+        if (notes !== undefined) updateFields.notes = notes;
+
+        const order = await Order.findOneAndUpdate(query, { $set: updateFields }, { new: true });
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Order not found" });
+        }
+
+        res.json({ success: true, order, data: order });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+module.exports = {
+    getAllOrders,
+    getOrderById,
+    getOrdersByCustomer,
+    createOrder,
+    createRazorpayOrder,
+    cancelOrder,
+    handleRazorpayWebhook,
+    updateOrderStatus
+};
 

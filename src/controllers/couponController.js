@@ -76,4 +76,57 @@ const createCoupon = async (req, res) => {
     }
 };
 
-module.exports = { getAllCoupons, getCouponByCode, createCoupon };
+// PUT /api/coupons/:id (Admin Only)
+const updateCoupon = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const data = req.body;
+        const mongoose = require("mongoose");
+
+        let query = {};
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            query = { _id: new mongoose.Types.ObjectId(id) };
+        } else {
+            query = { code: id.toUpperCase().trim() };
+        }
+
+        if (data.code) {
+            data.code = data.code.toUpperCase().trim();
+        }
+
+        const coupon = await Coupon.findOneAndUpdate(query, { $set: data }, { new: true, runValidators: true });
+        if (!coupon) {
+            return res.status(404).json({ success: false, message: "Coupon not found" });
+        }
+
+        res.json({ success: true, coupon, data: coupon });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// DELETE /api/coupons/:id (Admin Only)
+const deleteCoupon = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const mongoose = require("mongoose");
+
+        let query = {};
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            query = { _id: new mongoose.Types.ObjectId(id) };
+        } else {
+            query = { code: id.toUpperCase().trim() };
+        }
+
+        const coupon = await Coupon.findOneAndDelete(query);
+        if (!coupon) {
+            return res.status(404).json({ success: false, message: "Coupon not found" });
+        }
+
+        res.json({ success: true, message: "Coupon deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+module.exports = { getAllCoupons, getCouponByCode, createCoupon, updateCoupon, deleteCoupon };
