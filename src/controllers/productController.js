@@ -130,6 +130,7 @@ const getAllProducts = async (req, res) => {
 
         const [products, total] = await Promise.all([
             Product.find(filter)
+                .populate("categoryId", "name title slug")
                 .populate("categoryIds", "name title slug")
                 .sort(sortCriteria)
                 .skip(skip)
@@ -163,6 +164,7 @@ const getProductByHandle = async (req, res) => {
             query = { $or: [{ _id: new mongoose.Types.ObjectId(handle) }, { handle }] };
         }
         const product = await Product.findOne(query)
+            .populate("categoryId", "name title slug")
             .populate("categoryIds", "name title slug")
             .lean();
 
