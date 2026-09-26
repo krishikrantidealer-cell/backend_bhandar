@@ -28,56 +28,89 @@ function getSortCriteria(sortParam) {
 // Query params: ?page=1&limit=50&category=<id|slug|name>&collection=<name>&search=<text>&status=active&sort=...
 const getAllProducts = async (req, res) => {
     try {
-        const { page = 1, limit = 50, category, categoryId, collection, search, status, buy1get1, sort } = req.query;
+        const { page = 1, limit = 50, category, categoryId, collection, collectionId, search, status, buy1get1, sort } = req.query;
 
         const filter = {};
         const conditions = [];
 
-        const rawCat = (req.params.categoryId || category || categoryId || "").toString().trim();
+        const rawCat = (req.params.categoryId || category || categoryId || collection || collectionId || "").toString().trim();
         if (rawCat) {
             const catConditions = [];
 
             // Special Handling: Buy 1 Get 1
-            if (/^buy[-_ ]?1[-_ ]?get[-_ ]?1$/i.test(rawCat)) {
+            if (/^(buy[-_ ]?1[-_ ]?get[-_ ]?1|bogo)$/i.test(rawCat)) {
                 catConditions.push({ buy1get1: true });
-                catConditions.push({ assignedCollections: "Buy 1 Get 1" });
+                catConditions.push({ assignedCollections: /buy 1 get 1|bogo/i });
                 catConditions.push({ title: /1\+1 free|buy 1 get 1|1\+1/i });
             }
             // Special Handling: Best Sellers
             else if (/^best[-_ ]?sellers?$/i.test(rawCat)) {
-                catConditions.push({ assignedCollections: /best sellers|bestseller/i });
-                catConditions.push({ tags: /best seller|bestseller|featured/i });
-                // If none explicitly tagged, match top products with rating or status active
-                catConditions.push({ status: "active" });
+                catConditions.push({ assignedCollections: /best[-_ ]?sellers?/i });
+                catConditions.push({ tags: /best[-_ ]?sellers?|bestseller|featured/i });
             } else {
-                const resolvedIds = [];
+                const resolvedCatIds = [];
                 if (mongoose.Types.ObjectId.isValid(rawCat)) {
-                    resolvedIds.push(new mongoose.Types.ObjectId(rawCat));
+                    resolvedCatIds.push(new mongoose.Types.ObjectId(rawCat));
                 }
 
+                // Check Category
                 const catDoc = await Category.findOne({
                     $or: [
+                        { _id: mongoose.Types.ObjectId.isValid(rawCat) ? new mongoose.Types.ObjectId(rawCat) : null },
                         { slug: rawCat },
                         { slug: new RegExp(`^${rawCat}$`, "i") },
                         { name: new RegExp(`^${rawCat}$`, "i") },
                         { title: new RegExp(`^${rawCat}$`, "i") }
-                    ]
+                    ].filter(q => q._id !== null)
                 }).lean();
 
-                if (catDoc && !resolvedIds.some(id => id.toString() === catDoc._id.toString())) {
-                    resolvedIds.push(catDoc._id);
+                if (catDoc && !resolvedCatIds.some(id => id.toString() === catDoc._id.toString())) {
+                    resolvedCatIds.push(catDoc._id);
                 }
 
-                if (resolvedIds.length > 0) {
-                    catConditions.push({ categoryId: { $in: resolvedIds } });
-                    catConditions.push({ categoryIds: { $in: resolvedIds } });
+                if (resolvedCatIds.length > 0) {
+                    catConditions.push({ categoryId: { $in: resolvedCatIds } });
+                    catConditions.push({ categoryIds: { $in: resolvedCatIds } });
+                }
+
+                // Check Collection
+                const colDoc = await Collection.findOne({
+                    $or: [
+                        { _id: mongoose.Types.ObjectId.isValid(rawCat) ? new mongoose.Types.ObjectId(rawCat) : null },
+                        { slug: rawCat },
+                        { slug: new RegExp(`^${rawCat}$`, "i") },
+                        { name: new RegExp(`^${rawCat}$`, "i") }
+                    ].filter(q => q._id !== null)
+                }).lean();
+
+                if (colDoc) {
+                    catConditions.push({ assignedCollections: colDoc.name });
+                    catConditions.push({ assignedCollections: new RegExp(`^${colDoc.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i") });
+                    if (colDoc.slug) {
+                        catConditions.push({ assignedCollections: colDoc.slug });
+                        catConditions.push({ assignedCollections: new RegExp(`^${colDoc.slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i") });
+                    }
+                    catConditions.push({ assignedCollections: colDoc._id.toString() });
+
+                    if (/best[-_ ]?sellers?/i.test(colDoc.name) || /best[-_ ]?sellers?/i.test(colDoc.slug)) {
+                        catConditions.push({ assignedCollections: /best[-_ ]?sellers?/i });
+                        catConditions.push({ tags: /best[-_ ]?sellers?|bestseller/i });
+                    }
+                    if (/buy[-_ ]?1[-_ ]?get[-_ ]?1|bogo/i.test(colDoc.name) || /buy[-_ ]?1[-_ ]?get[-_ ]?1|bogo/i.test(colDoc.slug)) {
+                        catConditions.push({ buy1get1: true });
+                        catConditions.push({ title: /1\+1 free|buy 1 get 1|1\+1/i });
+                    }
                 }
 
                 const spaceCat = rawCat.replace(/[-_]/g, " ");
-                catConditions.push({ assignedCollections: new RegExp(`^${rawCat}$`, "i") });
-                catConditions.push({ assignedCollections: new RegExp(`^${spaceCat}$`, "i") });
-                catConditions.push({ category: new RegExp(`^${rawCat}$`, "i") });
-                catConditions.push({ category: new RegExp(`^${spaceCat}$`, "i") });
+                const escapedRaw = rawCat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const escapedSpace = spaceCat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+                catConditions.push({ assignedCollections: new RegExp(`^${escapedRaw}$`, "i") });
+                catConditions.push({ assignedCollections: new RegExp(`^${escapedSpace}$`, "i") });
+                catConditions.push({ category: new RegExp(`^${escapedRaw}$`, "i") });
+                catConditions.push({ category: new RegExp(`^${escapedSpace}$`, "i") });
+                catConditions.push({ tags: new RegExp(`^${escapedRaw}$`, "i") });
             }
 
             if (catConditions.length > 0) {

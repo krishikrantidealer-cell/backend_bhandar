@@ -321,44 +321,72 @@ const createOrder = async (req, res) => {
             }
         }
 
-        if (!orderData.createdAt) {
-            orderData.createdAt = new Date();
+        // 5. Execute Order creation, stock decrement, and customer update in an ACID MongoDB Transaction
+        const session = await mongoose.startSession();
+        let sessionActive = false;
+        try {
+            session.startTransaction();
+            sessionActive = true;
+        } catch (_) {
+            sessionActive = false;
         }
 
-        // 5. Save order
-        const newOrder = new Order(orderData);
-        await newOrder.save();
+        let newOrder;
+        try {
+            const opts = sessionActive ? { session } : {};
 
-        // 6. Safely decrement stock for products
-        for (const item of verifiedLineItems) {
-            if (item.productId && item.sku) {
-                try {
-                    const product = await Product.findById(item.productId);
-                    if (product && product.variants) {
-                        const vIndex = product.variants.findIndex(v => v.sku === item.sku);
-                        if (vIndex > -1) {
-                            const currentStock = parseInt(product.variants[vIndex].stock, 10) || 0;
-                            product.variants[vIndex].stock = Math.max(0, currentStock - item.quantity);
-                            await product.save();
-                        }
+            newOrder = new Order(orderData);
+            await newOrder.save(opts);
+
+            // 6. Atomically decrement stock for products with optimistic concurrency
+            for (const item of verifiedLineItems) {
+                if (item.productId && item.sku) {
+                    try {
+                        await Product.updateOne(
+                            { _id: item.productId, "variants.sku": item.sku },
+                            { $inc: { "variants.$.stock": -item.quantity } },
+                            opts
+                        );
+                    } catch (stockErr) {
+                        console.error("Stock decrement error:", stockErr.message);
                     }
-                } catch (stockErr) {
-                    console.error("Stock decrement error:", stockErr.message);
                 }
             }
-        }
 
-        // 7. Clear user's cart in DB
-        if (req.user && req.user.id) {
-            await Cart.findOneAndUpdate(
-                { customerId: req.user.id },
-                { items: [], couponCode: "", subtotal: 0, discountAmount: 0, total: 0 }
-            );
+            // 7. Clear user's cart in DB & update customer stats
+            if (req.user && req.user.id) {
+                await Cart.findOneAndUpdate(
+                    { customerId: req.user.id },
+                    { items: [], couponCode: "", subtotal: 0, discountAmount: 0, total: 0 },
+                    opts
+                );
 
-            // Update customer totalSpent & totalOrders
-            await Customer.findByIdAndUpdate(req.user.id, {
-                $inc: { totalOrders: 1, totalSpent: total }
-            });
+                await Customer.findByIdAndUpdate(
+                    req.user.id,
+                    { $inc: { totalOrders: 1, totalSpent: total } },
+                    opts
+                );
+            }
+
+            // 8. Increment Coupon usage
+            if (validCouponCode) {
+                await Coupon.updateOne(
+                    { code: validCouponCode },
+                    { $inc: { usageCount: 1 } },
+                    opts
+                );
+            }
+
+            if (sessionActive) {
+                await session.commitTransaction();
+            }
+        } catch (trxErr) {
+            if (sessionActive) {
+                await session.abortTransaction();
+            }
+            throw trxErr;
+        } finally {
+            session.endSession();
         }
 
         res.status(201).json({ success: true, data: newOrder });
