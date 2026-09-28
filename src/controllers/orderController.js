@@ -587,7 +587,8 @@ const handleRazorpayWebhook = async (req, res) => {
 const updateOrderStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { status, financialStatus, fulfillmentStatus, notes } = req.body;
+        const statusVal = req.body.status || req.body.orderStatus;
+        const { financialStatus, fulfillmentStatus, notes } = req.body;
 
         let query = {};
         if (mongoose.Types.ObjectId.isValid(id)) {
@@ -598,7 +599,7 @@ const updateOrderStatus = async (req, res) => {
         }
 
         const updateFields = {};
-        if (status) updateFields.status = status;
+        if (statusVal) updateFields.status = String(statusVal).toLowerCase();
         if (financialStatus) updateFields.financialStatus = financialStatus;
         if (fulfillmentStatus) updateFields.fulfillmentStatus = fulfillmentStatus;
         if (notes !== undefined) updateFields.notes = notes;
