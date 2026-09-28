@@ -42,10 +42,11 @@ async function calculateOrderTotals(lineItemsInput, couponCodeInput) {
         }
 
         const itemTotal = price * quantity;
-        subtotal += itemTotal;
+        const variantId = variant?._id?.toString() || item.variantId || item.variant_id || null;
 
         verifiedLineItems.push({
             productId,
+            variantId,
             name,
             sku,
             price,
@@ -340,13 +341,24 @@ const createOrder = async (req, res) => {
 
             // 6. Atomically decrement stock for products with optimistic concurrency
             for (const item of verifiedLineItems) {
-                if (item.productId && item.sku) {
+                if (item.productId) {
                     try {
-                        await Product.updateOne(
-                            { _id: item.productId, "variants.sku": item.sku },
-                            { $inc: { "variants.$.stock": -item.quantity } },
-                            opts
-                        );
+                        const variantFilter = (item.variantId && mongoose.Types.ObjectId.isValid(item.variantId))
+                            ? { _id: item.productId, "variants._id": item.variantId }
+                            : (item.sku ? { _id: item.productId, "variants.sku": item.sku } : { _id: item.productId });
+
+                        if (variantFilter["variants._id"] || variantFilter["variants.sku"]) {
+                            await Product.updateOne(
+                                variantFilter,
+                                { 
+                                    $inc: { 
+                                        "variants.$.inventoryQuantity": -item.quantity,
+                                        "variants.$.stock": -item.quantity 
+                                    } 
+                                },
+                                opts
+                            );
+                        }
                     } catch (stockErr) {
                         console.error("Stock decrement error:", stockErr.message);
                     }

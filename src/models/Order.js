@@ -75,6 +75,8 @@ OrderSchema.index({
 
 // Compound & Lookup Indexes
 OrderSchema.index({ phone: 1, createdAt: -1 });
+OrderSchema.index({ "billingAddress.phone": 1, createdAt: -1 });
+OrderSchema.index({ "shippingAddress.phone": 1, createdAt: -1 });
 OrderSchema.index({ email: 1, createdAt: -1 });
 OrderSchema.index({ status: 1, createdAt: -1 });
 OrderSchema.index({ razorpayOrderId: 1 });

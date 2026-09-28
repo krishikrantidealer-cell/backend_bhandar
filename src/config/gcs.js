@@ -32,9 +32,12 @@ const uploadToGCS = async (buffer, destination, contentType) => {
 
     const file = bucket.file(destination);
 
-    // Save buffer to GCS
+    // Save buffer to GCS with long-term immutable cache control
     await file.save(buffer, {
-        metadata: { contentType },
+        metadata: { 
+            contentType,
+            cacheControl: "public, max-age=31536000, immutable"
+        },
         resumable: false
     });
 

@@ -144,14 +144,28 @@ const getAllProducts = async (req, res) => {
 
         if (search) {
             const cleanSearch = search.trim();
-            conditions.push({
-                $or: [
-                    { title: { $regex: cleanSearch, $options: "i" } },
-                    { vendor: { $regex: cleanSearch, $options: "i" } },
-                    { tags: { $regex: cleanSearch, $options: "i" } },
-                    { "variants.sku": { $regex: cleanSearch, $options: "i" } }
-                ]
-            });
+            if (cleanSearch) {
+                const escapedSearch = cleanSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const words = cleanSearch.split(/\s+/).filter(Boolean).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+                const wordRegexList = words.map(w => ({ title: { $regex: w, $options: "i" } }));
+
+                const searchOr = [
+                    { title: { $regex: escapedSearch, $options: "i" } },
+                    { vendor: { $regex: escapedSearch, $options: "i" } },
+                    { brand: { $regex: escapedSearch, $options: "i" } },
+                    { tags: { $regex: escapedSearch, $options: "i" } },
+                    { category: { $regex: escapedSearch, $options: "i" } },
+                    { assignedCollections: { $regex: escapedSearch, $options: "i" } },
+                    { "variants.sku": { $regex: escapedSearch, $options: "i" } },
+                    { "variants.title": { $regex: escapedSearch, $options: "i" } }
+                ];
+
+                if (wordRegexList.length > 1) {
+                    searchOr.push({ $and: wordRegexList });
+                }
+
+                conditions.push({ $or: searchOr });
+            }
         }
 
         if (conditions.length > 0) {

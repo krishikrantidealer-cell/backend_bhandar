@@ -4,15 +4,17 @@ const multer = require("multer");
 const { uploadToGCS } = require("../config/gcs");
 const { authMiddleware, adminMiddleware } = require("../middleware/auth");
 
+const sharp = require("sharp");
+
 // In-memory multer — no disk writes, upload directly to GCS
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 15 * 1024 * 1024 }, // 15 MB max
+    limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB max (compressed down automatically)
 });
 
 /**
  * POST /api/upload
- * Generic image upload to Krishi Bhandar GCS bucket.
+ * Generic image upload to Krishi Bhandar GCS bucket with automatic Sharp compression.
  * Accepts: multipart/form-data with field "file" or "image"
  * Body field "folder" (optional, default: "images") — sets the bucket folder prefix.
  * Returns: { success: true, url: "https://storage.googleapis.com/..." }
@@ -35,11 +37,32 @@ router.post(
             }
 
             const folder = (req.body.folder || "images").replace(/[^a-zA-Z0-9_\-\/]/g, "");
-            const ext = (file.originalname || "image").split(".").pop().toLowerCase() || "jpg";
-            const safeName = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+            const origExt = (file.originalname || "image").split(".").pop().toLowerCase() || "jpg";
+            
+            let processedBuffer = file.buffer;
+            let processedMime = file.mimetype || "image/jpeg";
+            let finalExt = origExt;
+
+            // Compress & optimize using sharp if image
+            if (!file.mimetype?.includes("svg") && !file.mimetype?.includes("gif")) {
+                try {
+                    processedBuffer = await sharp(file.buffer)
+                        .rotate() // Auto-orient via EXIF
+                        .resize(1600, 1600, { fit: "inside", withoutEnlargement: true })
+                        .webp({ quality: 82, effort: 4 })
+                        .toBuffer();
+                    processedMime = "image/webp";
+                    finalExt = "webp";
+                } catch (sharpErr) {
+                    console.warn("⚠️ Sharp image compression failed, using original buffer:", sharpErr.message);
+                    processedBuffer = file.buffer;
+                }
+            }
+
+            const safeName = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${finalExt}`;
             const destination = `${folder}/${safeName}`;
 
-            const url = await uploadToGCS(file.buffer, destination, file.mimetype || "image/jpeg");
+            const url = await uploadToGCS(processedBuffer, destination, processedMime);
 
             return res.status(201).json({
                 success: true,
