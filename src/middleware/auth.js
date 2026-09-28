@@ -39,6 +39,54 @@ const authMiddleware = async (req, res, next) => {
     }
 };
 
+const optionalAuthMiddleware = async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            req.user = null;
+            return next();
+        }
+
+        const token = authHeader.split(" ")[1];
+        const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "krishikranti_super_secure_token_secret_2026";
+
+        const decoded = jwt.verify(token, secret);
+
+        try {
+            const redisClient = await getRedisClient();
+            const sessionDataStr = await redisClient.get(`session:${token}`);
+            if (sessionDataStr) {
+                const sessionData = JSON.parse(sessionDataStr);
+                req.user = {
+                    id: decoded.id || sessionData.customerId,
+                    phone: decoded.phone || sessionData.phone,
+                    email: decoded.email || sessionData.email || "",
+                    role: sessionData.role || decoded.role || "customer"
+                };
+            } else {
+                req.user = {
+                    id: decoded.id,
+                    phone: decoded.phone,
+                    email: decoded.email || "",
+                    role: decoded.role || "customer"
+                };
+            }
+        } catch (_) {
+            req.user = {
+                id: decoded.id,
+                phone: decoded.phone,
+                email: decoded.email || "",
+                role: decoded.role || "customer"
+            };
+        }
+        req.token = token;
+        next();
+    } catch (error) {
+        req.user = null;
+        next();
+    }
+};
+
 const adminMiddleware = (req, res, next) => {
     if (!req.user || req.user.role !== "admin") {
         return res.status(403).json({ success: false, message: "Forbidden: Admin privileges required" });
@@ -46,4 +94,4 @@ const adminMiddleware = (req, res, next) => {
     next();
 };
 
-module.exports = { authMiddleware, adminMiddleware };
+module.exports = { authMiddleware, adminMiddleware, optionalAuthMiddleware };
