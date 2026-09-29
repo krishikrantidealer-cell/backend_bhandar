@@ -385,8 +385,47 @@ const updateProduct = async (req, res) => {
             if (imgUrl) {
                 data.images = [{ original: imgUrl, medium: imgUrl, low: imgUrl }];
             }
-        } else if (data.imageUrl) {
-            data.images = [{ original: data.imageUrl, medium: data.imageUrl, low: data.imageUrl }];
+        // Normalize category and productType
+        if (data.categoryId || data.category || data.categoryIds) {
+            let catId = data.categoryId;
+            let catIds = Array.isArray(data.categoryIds) ? [...data.categoryIds] : [];
+
+            if (catId && mongoose.Types.ObjectId.isValid(catId)) {
+                const catDoc = await Category.findById(catId);
+                if (catDoc) {
+                    data.productType = catDoc.name;
+                    data.categoryId = catDoc._id;
+                    if (!catIds.some(id => id.toString() === catDoc._id.toString())) {
+                        catIds.push(catDoc._id);
+                    }
+                }
+            } else if (data.category) {
+                const catDoc = await Category.findOne({
+                    $or: [
+                        { _id: mongoose.Types.ObjectId.isValid(data.category) ? new mongoose.Types.ObjectId(data.category) : null },
+                        { name: new RegExp(`^${String(data.category).trim()}$`, "i") },
+                        { slug: new RegExp(`^${String(data.category).trim()}$`, "i") }
+                    ].filter(q => q._id !== null)
+                });
+                if (catDoc) {
+                    data.categoryId = catDoc._id;
+                    data.productType = catDoc.name;
+                    if (!catIds.some(id => id.toString() === catDoc._id.toString())) {
+                        catIds.push(catDoc._id);
+                    }
+                }
+            }
+
+            if (catIds.length > 0) {
+                data.categoryIds = catIds;
+            }
+        }
+
+        // Clean assigned collections
+        if (Array.isArray(data.assignedCollections)) {
+            data.assignedCollections = data.assignedCollections
+                .map(c => String(c).trim())
+                .filter(Boolean);
         }
 
         const product = await Product.findOneAndUpdate(query, { $set: data }, { new: true, runValidators: true });
