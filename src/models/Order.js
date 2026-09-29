@@ -22,6 +22,9 @@ const LineItemSchema = new mongoose.Schema(
         quantity: { type: Number, default: 1 },
         price: { type: Number, default: 0.0 },
         sku: { type: String, default: "" },
+        productId: { type: String, default: "" },
+        variantId: { type: String, default: "" },
+        image: { type: String, default: "" },
         requiresShipping: { type: Boolean, default: true },
         taxable: { type: Boolean, default: false },
         fulfillmentStatus: { type: String, default: "pending" },
@@ -37,7 +40,7 @@ const OrderSchema = new mongoose.Schema(
         phone: { type: String, default: "", index: true, trim: true },
         status: {
             type: String,
-            enum: ["pending", "processing", "completed", "cancelled", "refunded"],
+            enum: ["pending", "processing", "completed", "cancelled", "refunded", "confirmed", "shipped", "delivered"],
             default: "pending",
             index: true
         },

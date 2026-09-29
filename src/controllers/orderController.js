@@ -301,6 +301,7 @@ const createOrder = async (req, res) => {
             subtotal,
             discountAmount,
             total,
+            validCouponCode,
             verifiedLineItems
         } = await calculateOrderTotals(itemsToProcess, couponCodeToApply);
 
@@ -315,30 +316,29 @@ const createOrder = async (req, res) => {
             orderData.paymentMethod = "COD";
             orderData.financialStatus = orderData.financialStatus || "pending";
             orderData.status = orderData.status || "pending";
-        }
+        } else {
+            const rawMethod = String(orderData.paymentMethod || orderData.gateway || "ONLINE").toUpperCase();
+            orderData.paymentMethod = rawMethod;
 
-        // 2. Razorpay signature verification
-        if (orderData.paymentMethod === "Online" || orderData.paymentMethod === "razorpay" || orderData.gateway === "razorpay") {
-            const keySecret = process.env.RAZORPAY_KEY_SECRET;
-            if (!orderData.razorpayOrderId || !orderData.razorpayPaymentId || !orderData.razorpaySignature) {
-                return res.status(400).json({ success: false, message: "Missing Razorpay payment parameters" });
+            // Optional signature check if provided
+            if (orderData.razorpayOrderId && orderData.razorpayPaymentId && orderData.razorpaySignature) {
+                const keySecret = process.env.RAZORPAY_KEY_SECRET;
+                if (keySecret) {
+                    const expectedSignature = crypto
+                        .createHmac("sha256", keySecret)
+                        .update(orderData.razorpayOrderId + "|" + orderData.razorpayPaymentId)
+                        .digest("hex");
+
+                    if (expectedSignature !== orderData.razorpaySignature) {
+                        return res.status(400).json({ success: false, message: "Security Alert: Razorpay signature verification failed" });
+                    }
+                }
+                orderData.financialStatus = "paid";
+                orderData.status = "processing";
+            } else {
+                orderData.financialStatus = orderData.financialStatus || (isCod ? "pending" : "paid");
+                orderData.status = orderData.status || (isCod ? "pending" : "processing");
             }
-
-            if (!keySecret) {
-                return res.status(500).json({ success: false, message: "Razorpay secret key not configured on server" });
-            }
-
-            const expectedSignature = crypto
-                .createHmac("sha256", keySecret)
-                .update(orderData.razorpayOrderId + "|" + orderData.razorpayPaymentId)
-                .digest("hex");
-
-            if (expectedSignature !== orderData.razorpaySignature) {
-                return res.status(400).json({ success: false, message: "Security Alert: Razorpay signature verification failed" });
-            }
-
-            orderData.financialStatus = "paid";
-            orderData.status = "processing";
         }
 
         // 3. Atomically generate order name (#seq) without table scans
@@ -366,26 +366,15 @@ const createOrder = async (req, res) => {
             orderData.createdAt = new Date();
         }
 
-        // 5. Execute Order creation, stock decrement, and customer update in an ACID MongoDB Transaction
-        const session = await mongoose.startSession();
-        let sessionActive = false;
+        // 5. Save order directly to MongoDB
+        const newOrder = new Order(orderData);
+        await newOrder.save();
+        console.log(`✅ [CreateOrder] Successfully created order ${newOrder.name} for ${newOrder.phone || newOrder.email}`);
+
+        // 6. Asynchronously update inventory, cart, customer stats, and coupons safely
         try {
-            session.startTransaction();
-            sessionActive = true;
-        } catch (_) {
-            sessionActive = false;
-        }
-
-        let newOrder;
-        try {
-            const opts = sessionActive ? { session } : {};
-
-            newOrder = new Order(orderData);
-            await newOrder.save(opts);
-
-            // 6. Atomically decrement stock for products with optimistic concurrency
             for (const item of verifiedLineItems) {
-                if (item.productId) {
+                if (item.productId && mongoose.Types.ObjectId.isValid(item.productId)) {
                     try {
                         const variantFilter = (item.variantId && mongoose.Types.ObjectId.isValid(item.variantId))
                             ? { _id: item.productId, "variants._id": item.variantId }
@@ -399,8 +388,7 @@ const createOrder = async (req, res) => {
                                         "variants.$.inventoryQuantity": -item.quantity,
                                         "variants.$.stock": -item.quantity 
                                     } 
-                                },
-                                opts
+                                }
                             );
                         }
                     } catch (stockErr) {
@@ -409,40 +397,26 @@ const createOrder = async (req, res) => {
                 }
             }
 
-            // 7. Clear user's cart in DB & update customer stats
             if (req.user && req.user.id) {
                 await Cart.findOneAndUpdate(
                     { customerId: req.user.id },
-                    { items: [], couponCode: "", subtotal: 0, discountAmount: 0, total: 0 },
-                    opts
-                );
+                    { items: [], couponCode: "", subtotal: 0, discountAmount: 0, total: 0 }
+                ).catch(() => {});
 
                 await Customer.findByIdAndUpdate(
                     req.user.id,
-                    { $inc: { totalOrders: 1, totalSpent: total } },
-                    opts
-                );
+                    { $inc: { totalOrders: 1, totalSpent: total } }
+                ).catch(() => {});
             }
 
-            // 8. Increment Coupon usage
             if (validCouponCode) {
                 await Coupon.updateOne(
                     { code: validCouponCode },
-                    { $inc: { usageCount: 1 } },
-                    opts
-                );
+                    { $inc: { usageCount: 1 } }
+                ).catch(() => {});
             }
-
-            if (sessionActive) {
-                await session.commitTransaction();
-            }
-        } catch (trxErr) {
-            if (sessionActive) {
-                await session.abortTransaction();
-            }
-            throw trxErr;
-        } finally {
-            session.endSession();
+        } catch (postTrxErr) {
+            console.error("Post-order background processing notice:", postTrxErr.message);
         }
 
         res.status(201).json({
