@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const multer = require("multer");
 const { uploadToGCS } = require("../config/gcs");
-const { authMiddleware, adminMiddleware } = require("../middleware/auth");
+const { optionalAuthMiddleware } = require("../middleware/auth");
 
 const sharp = require("sharp");
 
@@ -16,13 +16,12 @@ const upload = multer({
  * POST /api/upload
  * Generic image upload to Krishi Bhandar GCS bucket with automatic Sharp compression.
  * Accepts: multipart/form-data with field "file" or "image"
- * Body field "folder" (optional, default: "images") — sets the bucket folder prefix.
+ * Body field "folder" (optional, default: "images", e.g. "reviews", "categories", "products")
  * Returns: { success: true, url: "https://storage.googleapis.com/..." }
  */
 router.post(
     "/",
-    authMiddleware,
-    adminMiddleware,
+    optionalAuthMiddleware,
     upload.fields([
         { name: "file", maxCount: 1 },
         { name: "image", maxCount: 1 },
