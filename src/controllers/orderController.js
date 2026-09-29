@@ -20,6 +20,8 @@ async function calculateOrderTotals(lineItemsInput, couponCodeInput) {
         let quantity = Math.max(1, Number(item.quantity) || 1);
         let variant = null;
 
+        let image = (item.image || item.imageUrl || item.img || item.productImage || item.featuredImage || "").toString().trim();
+
         // Authoritative verification against Product database if productId provided
         if (productId && mongoose.Types.ObjectId.isValid(productId)) {
             const product = await Product.findById(productId);
@@ -37,6 +39,20 @@ async function calculateOrderTotals(lineItemsInput, couponCodeInput) {
                 if (variant) {
                     price = parseFloat(variant.price) || price || 0;
                     sku = variant.sku || sku;
+                    if (!image && variant.image) {
+                        image = typeof variant.image === "string" ? variant.image : (variant.image.original || variant.image.src || variant.image.url || "");
+                    }
+                }
+                if (!image && Array.isArray(product.images) && product.images.length > 0) {
+                    const firstImg = product.images[0];
+                    if (typeof firstImg === "string") {
+                        image = firstImg;
+                    } else if (firstImg && typeof firstImg === "object") {
+                        image = firstImg.original || firstImg.medium || firstImg.low || firstImg.src || firstImg.url || "";
+                    }
+                }
+                if (!image && product.image) {
+                    image = typeof product.image === "string" ? product.image : (product.image.original || product.image.src || product.image.url || "");
                 }
             }
         }
@@ -52,6 +68,7 @@ async function calculateOrderTotals(lineItemsInput, couponCodeInput) {
             sku,
             price,
             quantity,
+            image: image || "",
             requiresShipping: item.requiresShipping !== false,
             taxable: !!item.taxable,
             fulfillmentStatus: "pending",
