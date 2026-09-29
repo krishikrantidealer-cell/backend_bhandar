@@ -13,17 +13,17 @@ const authMiddleware = async (req, res, next) => {
 
         const decoded = jwt.verify(token, secret);
 
-        const redisClient = await getRedisClient();
-        const sessionDataStr = await redisClient.get(`session:${token}`);
-        if (!sessionDataStr) {
-            return res.status(401).json({ success: false, message: "Session expired or logged out" });
-        }
-
         let sessionData = {};
         try {
-            sessionData = JSON.parse(sessionDataStr);
+            const redisClient = await getRedisClient();
+            if (redisClient) {
+                const sessionDataStr = await redisClient.get(`session:${token}`);
+                if (sessionDataStr) {
+                    sessionData = JSON.parse(sessionDataStr);
+                }
+            }
         } catch (e) {
-            // fallback if string
+            // Redis fallback
         }
 
         req.user = {

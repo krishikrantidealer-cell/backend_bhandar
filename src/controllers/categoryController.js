@@ -94,7 +94,10 @@ const getCategoryById = async (req, res) => {
 // POST /api/categories (Admin Only)
 const createCategory = async (req, res) => {
     try {
-        const data = req.body;
+        const data = { ...req.body };
+        delete data._id;
+        delete data.id;
+
         if (!data.name) {
             return res.status(400).json({ success: false, message: "Category name is required" });
         }
@@ -104,6 +107,8 @@ const createCategory = async (req, res) => {
         if (existing) {
             slug = `${slug}-${Date.now()}`;
         }
+
+        const bannerImg = data.bannerImage || data.imageUrl || data.image || "";
 
         let subCategories = data.subCategories || [];
         if (typeof subCategories === "string") {
@@ -125,8 +130,9 @@ const createCategory = async (req, res) => {
             slug,
             handle: slug,
             description: data.description || "",
-            imageUrl: data.imageUrl || data.bannerImage || "",
-            bannerImage: data.bannerImage || "",
+            imageUrl: bannerImg,
+            image: bannerImg,
+            bannerImage: bannerImg,
             bannerTitle: data.bannerTitle || data.title || data.name,
             iconImage: data.iconImage || "",
             cataloguePdf: data.cataloguePdf || "",
@@ -137,6 +143,7 @@ const createCategory = async (req, res) => {
         await category.save();
         res.status(201).json({ success: true, category, data: category });
     } catch (error) {
+        console.error("❌ createCategory error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -145,7 +152,11 @@ const createCategory = async (req, res) => {
 const updateCategory = async (req, res) => {
     try {
         const { id } = req.params;
-        const data = req.body;
+        const data = { ...req.body };
+
+        // Strip immutable ID fields so MongoDB findOneAndUpdate does not fail
+        delete data._id;
+        delete data.id;
 
         let query = {};
         if (mongoose.Types.ObjectId.isValid(id)) {
@@ -154,12 +165,32 @@ const updateCategory = async (req, res) => {
             query = { slug: id };
         }
 
+        // Synchronize banner image fields
+        const bannerImg = data.bannerImage || data.imageUrl || data.image || "";
+        if (bannerImg) {
+            data.bannerImage = bannerImg;
+            data.imageUrl = bannerImg;
+            data.image = bannerImg;
+        }
+
         if (data.subCategories && typeof data.subCategories === "string") {
             data.subCategories = data.subCategories
                 .split(",")
                 .map(s => s.trim())
                 .filter(Boolean)
                 .map(name => ({ name }));
+        } else if (Array.isArray(data.subCategories)) {
+            data.subCategories = data.subCategories.map(s => {
+                if (typeof s === "string") return { name: s };
+                const subObj = { ...s };
+                if (subObj._id && !mongoose.Types.ObjectId.isValid(subObj._id)) {
+                    delete subObj._id;
+                }
+                if (subObj.id && !mongoose.Types.ObjectId.isValid(subObj.id)) {
+                    delete subObj.id;
+                }
+                return subObj;
+            });
         }
 
         const category = await Category.findOneAndUpdate(query, { $set: data }, { new: true, runValidators: true });
@@ -169,6 +200,7 @@ const updateCategory = async (req, res) => {
 
         res.json({ success: true, category, data: category });
     } catch (error) {
+        console.error("❌ updateCategory error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

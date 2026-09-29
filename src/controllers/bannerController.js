@@ -41,7 +41,10 @@ const createBanner = async (req, res) => {
 // ─── PUT /api/banners/:id  (Admin: update) ───────────────────────────────────
 const updateBanner = async (req, res) => {
     try {
-        const banner = await Banner.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        const data = { ...req.body };
+        delete data._id;
+        delete data.id;
+        const banner = await Banner.findByIdAndUpdate(req.params.id, { $set: data }, { new: true, runValidators: true });
         if (!banner) return res.status(404).json({ success: false, message: "Banner not found" });
         res.json({ success: true, banner });
     } catch (error) {

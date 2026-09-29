@@ -231,7 +231,10 @@ const getProductByHandle = async (req, res) => {
 // POST /api/products (Admin Only)
 const createProduct = async (req, res) => {
     try {
-        const data = req.body;
+        const data = { ...req.body };
+        delete data._id;
+        delete data.id;
+
         if (!data.title) {
             return res.status(400).json({ success: false, message: "Product title is required" });
         }
@@ -258,17 +261,33 @@ const createProduct = async (req, res) => {
                 compareAtPrice: (data.mrp !== undefined || data.compareAtPrice !== undefined) ? (data.mrp || data.compareAtPrice).toString() : "0",
                 stock: (data.stock !== undefined) ? data.stock.toString() : "0"
             }];
+        } else {
+            variants = variants.map(v => {
+                const vObj = { ...v };
+                if (vObj._id && !mongoose.Types.ObjectId.isValid(vObj._id)) delete vObj._id;
+                if (vObj.id && !mongoose.Types.ObjectId.isValid(vObj.id)) delete vObj.id;
+                return vObj;
+            });
         }
 
         // Normalize images
-        let images = data.images || [];
-        if (Array.isArray(images)) {
-            images = images.map(img => {
+        let images = [];
+        if (Array.isArray(data.images)) {
+            images = data.images.map(img => {
                 if (typeof img === "string") {
                     return { original: img, medium: img, low: img };
                 }
-                return img;
-            });
+                if (img && typeof img === "object") {
+                    const url = img.original || img.medium || img.low || img.src || img.url || "";
+                    return { original: url, medium: img.medium || url, low: img.low || url };
+                }
+                return { original: "", medium: "", low: "" };
+            }).filter(img => img.original && img.original.trim().length > 0);
+        } else if (data.image) {
+            const imgUrl = typeof data.image === "string" ? data.image : (data.image.original || data.image.url || "");
+            if (imgUrl) images.push({ original: imgUrl, medium: imgUrl, low: imgUrl });
+        } else if (data.imageUrl) {
+            images.push({ original: data.imageUrl, medium: data.imageUrl, low: data.imageUrl });
         }
 
         // Category resolution
@@ -306,6 +325,7 @@ const createProduct = async (req, res) => {
         await product.save();
         res.status(201).json({ success: true, product, data: product });
     } catch (error) {
+        console.error("❌ createProduct error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -314,7 +334,10 @@ const createProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const data = req.body;
+        const data = { ...req.body };
+
+        delete data._id;
+        delete data.id;
 
         let query = {};
         if (mongoose.Types.ObjectId.isValid(id)) {
@@ -335,8 +358,35 @@ const updateProduct = async (req, res) => {
             }
         }
 
+        // Clean variants
+        if (Array.isArray(data.variants)) {
+            data.variants = data.variants.map(v => {
+                const vObj = { ...v };
+                if (vObj._id && !mongoose.Types.ObjectId.isValid(vObj._id)) delete vObj._id;
+                if (vObj.id && !mongoose.Types.ObjectId.isValid(vObj.id)) delete vObj.id;
+                return vObj;
+            });
+        }
+
+        // Normalize images
         if (data.images && Array.isArray(data.images)) {
-            data.images = data.images.map(img => typeof img === "string" ? { original: img, medium: img, low: img } : img);
+            data.images = data.images.map(img => {
+                if (typeof img === "string") {
+                    return { original: img, medium: img, low: img };
+                }
+                if (img && typeof img === "object") {
+                    const url = img.original || img.medium || img.low || img.src || img.url || "";
+                    return { original: url, medium: img.medium || url, low: img.low || url };
+                }
+                return { original: "", medium: "", low: "" };
+            }).filter(img => img.original && img.original.trim().length > 0);
+        } else if (data.image) {
+            const imgUrl = typeof data.image === "string" ? data.image : (data.image.original || data.image.url || "");
+            if (imgUrl) {
+                data.images = [{ original: imgUrl, medium: imgUrl, low: imgUrl }];
+            }
+        } else if (data.imageUrl) {
+            data.images = [{ original: data.imageUrl, medium: data.imageUrl, low: data.imageUrl }];
         }
 
         const product = await Product.findOneAndUpdate(query, { $set: data }, { new: true, runValidators: true });
@@ -346,6 +396,7 @@ const updateProduct = async (req, res) => {
 
         res.json({ success: true, product, data: product });
     } catch (error) {
+        console.error("❌ updateProduct error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

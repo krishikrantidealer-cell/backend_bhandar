@@ -111,7 +111,10 @@ const getCollectionBySlug = async (req, res) => {
 // POST /api/collections (Admin Only)
 const createCollection = async (req, res) => {
     try {
-        const data = req.body;
+        const data = { ...req.body };
+        delete data._id;
+        delete data.id;
+
         if (!data.name) {
             return res.status(400).json({ success: false, message: "Collection name is required" });
         }
@@ -121,6 +124,8 @@ const createCollection = async (req, res) => {
         if (existing) {
             slug = `${slug}-${Date.now()}`;
         }
+
+        const bannerImg = data.bannerImage || data.imageUrl || data.image || "";
 
         let subCollections = data.subCollections || [];
         if (typeof subCollections === "string") {
@@ -142,12 +147,19 @@ const createCollection = async (req, res) => {
                         isActive: true
                     };
                 }
+                const subObj = { ...s };
+                if (subObj._id && !mongoose.Types.ObjectId.isValid(subObj._id)) {
+                    delete subObj._id;
+                }
+                if (subObj.id && !mongoose.Types.ObjectId.isValid(subObj.id)) {
+                    delete subObj.id;
+                }
                 return {
-                    name: s.name,
-                    slug: s.slug || (s.name ? s.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") : ""),
-                    image: s.image || "",
-                    count: s.count || "",
-                    isActive: s.isActive !== undefined ? s.isActive : true
+                    name: subObj.name,
+                    slug: subObj.slug || (subObj.name ? subObj.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") : ""),
+                    image: subObj.image || "",
+                    count: subObj.count || "",
+                    isActive: subObj.isActive !== undefined ? subObj.isActive : true
                 };
             });
         }
@@ -156,7 +168,9 @@ const createCollection = async (req, res) => {
             name: data.name,
             slug,
             description: data.description || "",
-            bannerImage: data.bannerImage || "",
+            bannerImage: bannerImg,
+            image: bannerImg,
+            imageUrl: bannerImg,
             stripBanner: data.stripBanner || "",
             bannerTitle: data.bannerTitle || data.name,
             headingType: data.headingType || "both",
@@ -168,6 +182,7 @@ const createCollection = async (req, res) => {
         await collection.save();
         res.status(201).json({ success: true, collection, data: collection });
     } catch (error) {
+        console.error("❌ createCollection error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -176,14 +191,24 @@ const createCollection = async (req, res) => {
 const updateCollection = async (req, res) => {
     try {
         const { id } = req.params;
-        const data = req.body;
+        const data = { ...req.body };
 
-        let query = {};
+        delete data._id;
+        delete data.id;
+
         const mongoose = require("mongoose");
+        let query = {};
         if (mongoose.Types.ObjectId.isValid(id)) {
             query = { _id: new mongoose.Types.ObjectId(id) };
         } else {
             query = { slug: id };
+        }
+
+        const bannerImg = data.bannerImage || data.imageUrl || data.image || "";
+        if (bannerImg) {
+            data.bannerImage = bannerImg;
+            data.image = bannerImg;
+            data.imageUrl = bannerImg;
         }
 
         if (data.subCollections && typeof data.subCollections === "string") {
@@ -196,6 +221,24 @@ const updateCollection = async (req, res) => {
                     slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
                     isActive: true
                 }));
+        } else if (Array.isArray(data.subCollections)) {
+            data.subCollections = data.subCollections.map(s => {
+                if (typeof s === "string") {
+                    return {
+                        name: s,
+                        slug: s.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+                        isActive: true
+                    };
+                }
+                const subObj = { ...s };
+                if (subObj._id && !mongoose.Types.ObjectId.isValid(subObj._id)) {
+                    delete subObj._id;
+                }
+                if (subObj.id && !mongoose.Types.ObjectId.isValid(subObj.id)) {
+                    delete subObj.id;
+                }
+                return subObj;
+            });
         }
 
         const collection = await Collection.findOneAndUpdate(query, { $set: data }, { new: true, runValidators: true });
@@ -205,6 +248,7 @@ const updateCollection = async (req, res) => {
 
         res.json({ success: true, collection, data: collection });
     } catch (error) {
+        console.error("❌ updateCollection error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

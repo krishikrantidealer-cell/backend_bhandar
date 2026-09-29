@@ -80,7 +80,9 @@ const createCoupon = async (req, res) => {
 const updateCoupon = async (req, res) => {
     try {
         const { id } = req.params;
-        const data = req.body;
+        const data = { ...req.body };
+        delete data._id;
+        delete data.id;
         const mongoose = require("mongoose");
 
         let query = {};
