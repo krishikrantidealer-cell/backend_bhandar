@@ -40,8 +40,26 @@ const OrderSchema = new mongoose.Schema(
         phone: { type: String, default: "", index: true, trim: true },
         status: {
             type: String,
-            enum: ["pending", "processing", "completed", "cancelled", "refunded", "confirmed", "shipped", "delivered"],
-            default: "pending",
+            enum: [
+                "not_confirmed",
+                "confirmed",
+                "shipped",
+                "rack_up",
+                "in_transit",
+                "out_for_delivery",
+                "delivered",
+                "rto_in_transit",
+                "rto_delivered",
+                "hold",
+                "delayed",
+                "lost",
+                "cancelled",
+                "pending",
+                "processing",
+                "completed",
+                "refunded"
+            ],
+            default: "not_confirmed",
             index: true
         },
         financialStatus: { type: String, default: "" },

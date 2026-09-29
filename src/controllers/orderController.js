@@ -673,7 +673,9 @@ const updateOrderStatus = async (req, res) => {
         }
 
         const updateFields = {};
-        if (statusVal) updateFields.status = String(statusVal).toLowerCase();
+        if (statusVal) {
+            updateFields.status = String(statusVal).toLowerCase().trim().replace(/-/g, '_').replace(/ /g, '_');
+        }
         if (financialStatus) updateFields.financialStatus = financialStatus;
         if (fulfillmentStatus) updateFields.fulfillmentStatus = fulfillmentStatus;
         if (notes !== undefined) updateFields.notes = notes;
@@ -682,6 +684,8 @@ const updateOrderStatus = async (req, res) => {
         if (!order) {
             return res.status(404).json({ success: false, message: "Order not found" });
         }
+
+        await hydrateOrderImages(order);
 
         res.json({ success: true, order, data: order });
     } catch (error) {
