@@ -113,6 +113,83 @@ async function calculateOrderTotals(lineItemsInput, couponCodeInput) {
     };
 }
 
+// Helper to automatically hydrate and heal missing line item images from Product collection
+async function hydrateOrderImages(orders) {
+    if (!orders) return orders;
+    const isSingle = !Array.isArray(orders);
+    const orderList = isSingle ? [orders] : orders;
+
+    const missingProductIds = [];
+    for (const ord of orderList) {
+        if (ord && Array.isArray(ord.lineItems)) {
+            for (const item of ord.lineItems) {
+                if ((!item.image || item.image.toString().trim() === "") && item.productId && mongoose.Types.ObjectId.isValid(item.productId)) {
+                    missingProductIds.push(item.productId.toString());
+                }
+            }
+        }
+    }
+
+    if (missingProductIds.length === 0) return orders;
+
+    try {
+        const uniqueIds = Array.from(new Set(missingProductIds));
+        const products = await Product.find({ _id: { $in: uniqueIds } }).select("images variants image title").lean();
+        const productMap = new Map();
+
+        for (const prod of products) {
+            let defaultImg = "";
+            if (Array.isArray(prod.images) && prod.images.length > 0) {
+                const first = prod.images[0];
+                defaultImg = typeof first === "string" ? first : (first?.original || first?.medium || first?.low || first?.src || first?.url || "");
+            }
+            if (!defaultImg && prod.image) {
+                defaultImg = typeof prod.image === "string" ? prod.image : (prod.image?.original || prod.image?.src || prod.image?.url || "");
+            }
+            productMap.set(prod._id.toString(), { defaultImg, variants: prod.variants || [] });
+        }
+
+        for (const ord of orderList) {
+            let changed = false;
+            if (ord && Array.isArray(ord.lineItems)) {
+                for (const item of ord.lineItems) {
+                    if ((!item.image || item.image.toString().trim() === "") && item.productId && productMap.has(item.productId.toString())) {
+                        const prodInfo = productMap.get(item.productId.toString());
+                        let foundImg = "";
+                        if (item.variantId && Array.isArray(prodInfo.variants)) {
+                            const variant = prodInfo.variants.find(v => v._id && v._id.toString() === item.variantId.toString());
+                            if (variant && variant.image) {
+                                foundImg = typeof variant.image === "string" ? variant.image : (variant.image?.original || variant.image?.src || variant.image?.url || "");
+                            }
+                        }
+                        if (!foundImg && item.sku && Array.isArray(prodInfo.variants)) {
+                            const variant = prodInfo.variants.find(v => v.sku === item.sku);
+                            if (variant && variant.image) {
+                                foundImg = typeof variant.image === "string" ? variant.image : (variant.image?.original || variant.image?.src || variant.image?.url || "");
+                            }
+                        }
+                        if (!foundImg) {
+                            foundImg = prodInfo.defaultImg;
+                        }
+                        if (foundImg) {
+                            item.image = foundImg;
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            // Auto-heal existing MongoDB document asynchronously
+            if (changed && ord._id) {
+                Order.updateOne({ _id: ord._id }, { $set: { lineItems: ord.lineItems } }).catch(() => {});
+            }
+        }
+    } catch (e) {
+        console.error("Order image hydration notice:", e.message);
+    }
+
+    return orders;
+}
+
 // GET /api/orders (Protected: Admin Only)
 // Query params: ?page=1&limit=20&search=<text>&financialStatus=<status>&fulfillmentStatus=<status>
 const getAllOrders = async (req, res) => {
@@ -133,6 +210,8 @@ const getAllOrders = async (req, res) => {
                 .limit(Number(limit)),
             Order.countDocuments(filter)
         ]);
+
+        await hydrateOrderImages(orders);
 
         res.json({
             success: true,
@@ -172,6 +251,8 @@ const getOrderById = async (req, res) => {
             return res.status(403).json({ success: false, message: "Forbidden: Access to this order is denied" });
         }
 
+        await hydrateOrderImages(order);
+
         res.json({ success: true, data: order });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -206,6 +287,8 @@ const getOrdersByCustomer = async (req, res) => {
         };
 
         const orders = await Order.find(filter).sort({ createdAt: -1 });
+
+        await hydrateOrderImages(orders);
 
         res.json({ success: true, count: orders.length, data: orders, orders });
     } catch (error) {
