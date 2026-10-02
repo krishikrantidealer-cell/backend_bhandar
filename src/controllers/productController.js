@@ -385,6 +385,8 @@ const updateProduct = async (req, res) => {
             if (imgUrl) {
                 data.images = [{ original: imgUrl, medium: imgUrl, low: imgUrl }];
             }
+        }
+
         // Normalize category and productType
         if (data.categoryId || data.category || data.categoryIds) {
             let catId = data.categoryId;

@@ -1,0 +1,2231 @@
+{
+  "info": {
+    "_postman_id": "e4d7a8b2-3f12-4c6e-89a1-7c9b0e123456",
+    "name": "Krishi Bhandar API",
+    "description": "Complete Postman collection for Krishi Bhandar e-commerce backend API.\n\nIncludes endpoints for Products, Categories, Collections, Cart, Orders & Payments (Razorpay), Customers, Coupons, Banners, Reviews, Media Upload, and Admin Dashboard.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://backend-bhandar-205278744741.asia-south1.run.app",
+      "type": "string",
+      "description": "Base URL of the backend API server"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT Bearer token for customer authentication"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT Bearer token for admin authentication"
+    }
+  ],
+  "item": [
+    {
+      "name": "🌱 Health Check",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                ""
+              ]
+            },
+            "description": "Check if the API server is alive and running."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@krishikranti.com\",\n  \"password\": \"admin_password\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticate admin user and obtain JWT token."
+          },
+          "response": []
+        },
+        {
+          "name": "Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"9876543210\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/send-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "send-otp"
+              ]
+            },
+            "description": "Send a 6-digit OTP code to mobile number via SMS (rate limited)."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"9876543210\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/verify-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "verify-otp"
+              ]
+            },
+            "description": "Verify OTP and register/login customer."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Logout user and invalidate current JWT session in Redis."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout All Devices",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout-all"
+              ]
+            },
+            "description": "Invalidate all active sessions across all devices for the user."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📦 Products",
+      "item": [
+        {
+          "name": "Get All Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products?page=1&limit=20&search=&category=&collection=&status=active&sort=newest",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                },
+                {
+                  "key": "category",
+                  "value": ""
+                },
+                {
+                  "key": "collection",
+                  "value": ""
+                },
+                {
+                  "key": "status",
+                  "value": "active"
+                },
+                {
+                  "key": "sort",
+                  "value": "newest"
+                }
+              ]
+            },
+            "description": "List products with search, filtering by category/collection, pagination, and sorting (price_asc, price_desc, title_asc, newest, oldest)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Products by Category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/category/:categoryId?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "category",
+                ":categoryId"
+              ],
+              "variable": [
+                {
+                  "key": "categoryId",
+                  "value": "seeds"
+                }
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Get products belonging to a specific category ID or slug."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product by Handle",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/:handle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                ":handle"
+              ],
+              "variable": [
+                {
+                  "key": "handle",
+                  "value": "organic-mustard-seeds-1kg"
+                }
+              ]
+            },
+            "description": "Fetch product details using handle slug or product ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Product (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Organic Mustard Seeds\",\n  \"handle\": \"organic-mustard-seeds-1kg\",\n  \"description\": \"Premium quality cold-pressed mustard seeds.\",\n  \"vendor\": \"Krishi Kranti\",\n  \"product_type\": \"Seeds\",\n  \"status\": \"active\",\n  \"tags\": [\n    \"organic\",\n    \"mustard\",\n    \"seeds\"\n  ],\n  \"categories\": [\n    \"Seeds\"\n  ],\n  \"assignedCollections\": [\n    \"Best Sellers\"\n  ],\n  \"variants\": [\n    {\n      \"title\": \"1 kg\",\n      \"price\": \"180.00\",\n      \"compare_at_price\": \"220.00\",\n      \"sku\": \"MUSTARD-1KG\",\n      \"inventory_quantity\": 100,\n      \"weight\": 1000,\n      \"weight_unit\": \"g\"\n    }\n  ],\n  \"images\": [\n    {\n      \"src\": \"https://storage.googleapis.com/krishibhandar/products/mustard.webp\",\n      \"alt\": \"Organic Mustard Seeds\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ]
+            },
+            "description": "Create a new product (Admin Only)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Product (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Organic Mustard Seeds (Updated)\",\n  \"status\": \"active\",\n  \"tags\": [\n    \"organic\",\n    \"mustard\",\n    \"seeds\",\n    \"bestseller\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<product_id>"
+                }
+              ]
+            },
+            "description": "Update product by ID (Admin Only)."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Product (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<product_id>"
+                }
+              ]
+            },
+            "description": "Delete product by ID (Admin Only)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🏷️ Categories",
+      "item": [
+        {
+          "name": "Get All Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories"
+              ]
+            },
+            "description": "Get all product categories."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Category by ID / Slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "seeds"
+                }
+              ]
+            },
+            "description": "Fetch category by ID, slug, or name."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Category (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Organic Seeds\",\n  \"slug\": \"organic-seeds\",\n  \"description\": \"High germination organic seeds\",\n  \"image\": \"https://storage.googleapis.com/krishibhandar/categories/seeds.webp\",\n  \"isFeatured\": true,\n  \"order\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories"
+              ]
+            },
+            "description": "Create a new category (Admin Only)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Category (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Organic Seeds & Bulbs\",\n  \"description\": \"Updated description for seeds category\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<category_id>"
+                }
+              ]
+            },
+            "description": "Update category details (Admin Only)."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Category (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<category_id>"
+                }
+              ]
+            },
+            "description": "Delete category by ID (Admin Only)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📚 Collections",
+      "item": [
+        {
+          "name": "Get All Collections",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/collections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "collections"
+              ]
+            },
+            "description": "Get list of all active collections with dynamic product counts."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Collection by Slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/collections/:slug",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "collections",
+                ":slug"
+              ],
+              "variable": [
+                {
+                  "key": "slug",
+                  "value": "best-sellers"
+                }
+              ]
+            },
+            "description": "Fetch collection details and sub-collections by slug or name."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Collection (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Best Sellers\",\n  \"slug\": \"best-sellers\",\n  \"description\": \"Our most popular farm products\",\n  \"image\": \"https://storage.googleapis.com/krishibhandar/collections/bestsellers.webp\",\n  \"priority\": 10,\n  \"isActive\": true,\n  \"subCollections\": [\n    {\n      \"name\": \"Vegetable Seeds\",\n      \"slug\": \"vegetable-seeds\"\n    },\n    {\n      \"name\": \"Fertilizers\",\n      \"slug\": \"fertilizers\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/collections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "collections"
+              ]
+            },
+            "description": "Create collection (Admin Only)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Collection (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Top Best Sellers\",\n  \"priority\": 15\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/collections/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "collections",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<collection_id>"
+                }
+              ]
+            },
+            "description": "Update collection (Admin Only)."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Collection (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/collections/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "collections",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<collection_id>"
+                }
+              ]
+            },
+            "description": "Delete collection by ID (Admin Only)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🛒 Cart",
+      "item": [
+        {
+          "name": "Get Cart",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cart",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "cart"
+              ]
+            },
+            "description": "Retrieve active customer cart with calculated subtotal, discounts, and item details."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Item to Cart",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"<product_id>\",\n  \"variantId\": \"<variant_id>\",\n  \"variantSku\": \"MUSTARD-1KG\",\n  \"title\": \"Organic Mustard Seeds\",\n  \"variantTitle\": \"1 kg\",\n  \"price\": 180,\n  \"image\": \"https://storage.googleapis.com/krishibhandar/products/mustard.webp\",\n  \"quantity\": 2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cart/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "cart",
+                "items"
+              ]
+            },
+            "description": "Add a product item / SKU to customer's cart."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Item Quantity in Cart",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 3\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cart/items/:variantIdOrSku",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "cart",
+                "items",
+                ":variantIdOrSku"
+              ],
+              "variable": [
+                {
+                  "key": "variantIdOrSku",
+                  "value": "MUSTARD-1KG"
+                }
+              ]
+            },
+            "description": "Update quantity of a line item in cart by SKU or variantId (passing quantity: 0 removes it)."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Item from Cart",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cart/items/:variantIdOrSku",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "cart",
+                "items",
+                ":variantIdOrSku"
+              ],
+              "variable": [
+                {
+                  "key": "variantIdOrSku",
+                  "value": "MUSTARD-1KG"
+                }
+              ]
+            },
+            "description": "Remove specific item from cart."
+          },
+          "response": []
+        },
+        {
+          "name": "Apply Coupon to Cart",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SAVE10\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cart/apply-coupon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "cart",
+                "apply-coupon"
+              ]
+            },
+            "description": "Apply promo discount code to cart."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Coupon from Cart",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cart/coupon",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "cart",
+                "coupon"
+              ]
+            },
+            "description": "Remove applied coupon code from cart."
+          },
+          "response": []
+        },
+        {
+          "name": "Clear Entire Cart",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cart",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "cart"
+              ]
+            },
+            "description": "Empty and clear all items from the customer's cart."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🛍️ Orders & Payments",
+      "item": [
+        {
+          "name": "Create Razorpay Order",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lineItems\": [\n    {\n      \"productId\": \"<product_id>\",\n      \"sku\": \"MUSTARD-1KG\",\n      \"name\": \"Organic Mustard Seeds\",\n      \"price\": 180,\n      \"quantity\": 2\n    }\n  ],\n  \"couponCode\": \"SAVE10\",\n  \"customerDetails\": {\n    \"name\": \"Ramesh Kumar\",\n    \"email\": \"ramesh@example.com\",\n    \"phone\": \"9876543210\"\n  },\n  \"shippingAddress\": {\n    \"name\": \"Ramesh Kumar\",\n    \"phone\": \"9876543210\",\n    \"address1\": \"House 123, Main Road\",\n    \"city\": \"Jaipur\",\n    \"province\": \"Rajasthan\",\n    \"zip\": \"302001\",\n    \"country\": \"India\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/razorpay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "razorpay"
+              ]
+            },
+            "description": "Initialize Razorpay order and get razorpayOrderId & amount in paise."
+          },
+          "response": []
+        },
+        {
+          "name": "Place Order (COD / Paid)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": {\n    \"firstName\": \"Ramesh\",\n    \"lastName\": \"Kumar\",\n    \"email\": \"ramesh@example.com\",\n    \"phone\": \"9876543210\"\n  },\n  \"lineItems\": [\n    {\n      \"productId\": \"<product_id>\",\n      \"sku\": \"MUSTARD-1KG\",\n      \"name\": \"Organic Mustard Seeds\",\n      \"price\": 180,\n      \"quantity\": 2\n    }\n  ],\n  \"shippingAddress\": {\n    \"firstName\": \"Ramesh\",\n    \"lastName\": \"Kumar\",\n    \"phone\": \"9876543210\",\n    \"address1\": \"House 123, Main Road\",\n    \"city\": \"Jaipur\",\n    \"province\": \"Rajasthan\",\n    \"zip\": \"302001\",\n    \"country\": \"India\"\n  },\n  \"billingAddress\": {\n    \"firstName\": \"Ramesh\",\n    \"lastName\": \"Kumar\",\n    \"phone\": \"9876543210\",\n    \"address1\": \"House 123, Main Road\",\n    \"city\": \"Jaipur\",\n    \"province\": \"Rajasthan\",\n    \"zip\": \"302001\",\n    \"country\": \"India\"\n  },\n  \"paymentMethod\": \"COD\",\n  \"couponCode\": \"SAVE10\",\n  \"note\": \"Please deliver in morning\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            },
+            "description": "Create order in database. Supports Cash on Delivery (COD) or Razorpay payment details."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Single Order by ID or Name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "#1001"
+                }
+              ]
+            },
+            "description": "Get order details by order name (e.g. #1001) or MongoDB ObjectId."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Orders for Customer",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/customer/:emailOrPhone?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "customer",
+                ":emailOrPhone"
+              ],
+              "variable": [
+                {
+                  "key": "emailOrPhone",
+                  "value": "9876543210"
+                }
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get all past orders for a specific customer phone or email."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Ordered by mistake\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/:id/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                ":id",
+                "cancel"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<order_id>"
+                }
+              ]
+            },
+            "description": "Cancel an order if eligible."
+          },
+          "response": []
+        },
+        {
+          "name": "List All Orders (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?page=1&limit=20&status=&paymentStatus=&search=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": ""
+                },
+                {
+                  "key": "paymentStatus",
+                  "value": ""
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "List all orders with pagination, search, status filter (Admin Only)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Order Status / Notes (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fulfillmentStatus\": \"fulfilled\",\n  \"financialStatus\": \"paid\",\n  \"note\": \"Dispatched via BlueDart courier\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<order_id>"
+                }
+              ]
+            },
+            "description": "Update order fulfillment / payment status and notes (Admin Only)."
+          },
+          "response": []
+        },
+        {
+          "name": "Razorpay Webhook Callback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-razorpay-signature",
+                "value": "<signature_hash>"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"payment.captured\",\n  \"payload\": {\n    \"payment\": {\n      \"entity\": {\n        \"id\": \"pay_xyz123\",\n        \"order_id\": \"order_abc123\",\n        \"status\": \"captured\",\n        \"amount\": 36000\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/webhook",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "webhook"
+              ]
+            },
+            "description": "Razorpay webhook listener for automated payment verification."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "👤 Customers",
+      "item": [
+        {
+          "name": "Get Current Customer Profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/customers/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "me"
+              ]
+            },
+            "description": "Get logged in customer's profile, default address, and address book."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Customer by ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/customers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<customer_id>"
+                }
+              ]
+            },
+            "description": "Fetch single customer profile (Self or Admin)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Customer Profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ramesh\",\n  \"lastName\": \"Kumar\",\n  \"email\": \"ramesh.new@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/customers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<customer_id>"
+                }
+              ]
+            },
+            "description": "Update customer personal details and default address (Self or Admin)."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Customer Address",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ramesh Farm\",\n  \"address1\": \"Plot 45, Agro Green Belt\",\n  \"city\": \"Jaipur\",\n  \"state\": \"Rajasthan\",\n  \"pincode\": \"302001\",\n  \"country\": \"India\",\n  \"phone\": \"9876543210\",\n  \"isDefault\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/customers/:id/addresses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                ":id",
+                "addresses"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<customer_id>"
+                }
+              ]
+            },
+            "description": "Add a shipping address to the customer's address book."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Customer Address",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/customers/:id/addresses/:addressId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                ":id",
+                "addresses",
+                ":addressId"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<customer_id>"
+                },
+                {
+                  "key": "addressId",
+                  "value": "<address_id>"
+                }
+              ]
+            },
+            "description": "Delete an address from customer address book."
+          },
+          "response": []
+        },
+        {
+          "name": "List All Customers (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/customers?page=1&limit=20&search=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "List all registered customers with search & pagination (Admin Only)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🎟️ Coupons",
+      "item": [
+        {
+          "name": "Get All Coupons",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/coupons?page=1&limit=20&status=active&search=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coupons"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "active"
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "List available coupons with status filter and pagination."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Coupon by Code",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/coupons/:code",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coupons",
+                ":code"
+              ],
+              "variable": [
+                {
+                  "key": "code",
+                  "value": "SAVE10"
+                }
+              ]
+            },
+            "description": "Check validity and retrieve details of a specific coupon code."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Coupon (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"FESTIVAL20\",\n  \"description\": \"20% discount on all seeds\",\n  \"discountType\": \"percentage\",\n  \"discountAmount\": 20,\n  \"minimumPurchase\": 500,\n  \"maximumDiscount\": 200,\n  \"usageLimit\": 100,\n  \"status\": \"active\",\n  \"startDate\": \"2026-01-01T00:00:00.000Z\",\n  \"endDate\": \"2026-12-31T23:59:59.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/coupons",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coupons"
+              ]
+            },
+            "description": "Create a discount coupon (Admin Only)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Coupon (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"discountAmount\": 25,\n  \"maximumDiscount\": 250\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/coupons/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coupons",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<coupon_id>"
+                }
+              ]
+            },
+            "description": "Update coupon by ID (Admin Only)."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Coupon (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/coupons/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coupons",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<coupon_id>"
+                }
+              ]
+            },
+            "description": "Delete coupon by ID (Admin Only)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🖼️ Banners",
+      "item": [
+        {
+          "name": "Get Banners",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/banners?type=home",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "banners"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "home",
+                  "description": "home | category"
+                }
+              ]
+            },
+            "description": "Fetch banners for home slider or category grid."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Banner (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"home\",\n  \"title\": \"Monsoon Special Offer\",\n  \"imageUrl\": \"https://storage.googleapis.com/krishibhandar/banners/monsoon.webp\",\n  \"linkType\": \"collection\",\n  \"linkValue\": \"best-sellers\",\n  \"order\": 1,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/banners",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "banners"
+              ]
+            },
+            "description": "Create a new banner with image URL (Admin Only)."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Banner Image (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "type",
+                  "value": "home",
+                  "type": "text"
+                },
+                {
+                  "key": "title",
+                  "value": "Festive Sale Banner",
+                  "type": "text"
+                },
+                {
+                  "key": "linkType",
+                  "value": "category",
+                  "type": "text"
+                },
+                {
+                  "key": "linkValue",
+                  "value": "seeds",
+                  "type": "text"
+                },
+                {
+                  "key": "order",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/banners/upload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "banners",
+                "upload"
+              ]
+            },
+            "description": "Upload banner image file to GCS and save banner in DB (Admin Only)."
+          },
+          "response": []
+        },
+        {
+          "name": "Seed Banners (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/banners/seed",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "banners",
+                "seed"
+              ]
+            },
+            "description": "Seed default pre-configured banner assets (Admin Only)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Banner (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Banner Title\",\n  \"order\": 2,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/banners/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "banners",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<banner_id>"
+                }
+              ]
+            },
+            "description": "Update banner details (Admin Only)."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Banner (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/banners/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "banners",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<banner_id>"
+                }
+              ]
+            },
+            "description": "Delete banner by ID (Admin Only)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "⭐ Reviews",
+      "item": [
+        {
+          "name": "Get Product Reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reviews?productId=<product_id>&page=1&limit=10&rating=&hasImages=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reviews"
+              ],
+              "query": [
+                {
+                  "key": "productId",
+                  "value": "<product_id>"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "rating",
+                  "value": ""
+                },
+                {
+                  "key": "hasImages",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Get approved reviews and rating breakdown for a product."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Product Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"<product_id>\",\n  \"customerName\": \"Ramesh Kumar\",\n  \"customerEmail\": \"ramesh@example.com\",\n  \"rating\": 5,\n  \"title\": \"Excellent germination quality!\",\n  \"comment\": \"Grew healthy crops within weeks. Highly recommended organic seeds.\",\n  \"images\": [\n    \"https://storage.googleapis.com/krishibhandar/reviews/review1.webp\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reviews",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reviews"
+              ]
+            },
+            "description": "Submit customer review for a product."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Review",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reviews/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reviews",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "<review_id>"
+                }
+              ]
+            },
+            "description": "Delete review by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "☁️ Media Upload",
+      "item": [
+        {
+          "name": "Upload Image to GCS",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                },
+                {
+                  "key": "folder",
+                  "value": "products",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/upload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "upload"
+              ]
+            },
+            "description": "Upload image (compressed automatically to WebP with Sharp) directly to Google Cloud Storage (GCS)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📊 Admin Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard Analytics",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dashboard",
+                "stats"
+              ]
+            },
+            "description": "Get real-time total sales, revenue, recent orders, and customer analytics (Admin Only)."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
